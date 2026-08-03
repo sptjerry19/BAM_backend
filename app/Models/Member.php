@@ -45,4 +45,9 @@ class Member extends Model
     {
         return $this->hasMany(Order::class);
     }
+
+    public function customEquipments(): HasMany
+    {
+        return $this->hasMany(MemberEquipment::class);
+    }
 }

@@ -17,7 +17,11 @@ class ProductController extends Controller
             $query->where('category', $request->category);
         }
 
-        return response()->json($query->get());
+        if ($request->filled('per_page')) {
+            return $this->success($query->paginate((int) $request->integer('per_page', 15)));
+        }
+
+        return $this->success($query->get());
     }
 
     public function store(Request $request): JsonResponse
@@ -37,16 +41,12 @@ class ProductController extends Controller
             'featured' => 'nullable|boolean',
         ]);
 
-        $product = Product::create($validated);
-
-        return response()->json($product, 201);
+        return $this->success(Product::create($validated), __('messages.created'), 201);
     }
 
     public function show(string $id): JsonResponse
     {
-        $product = Product::findOrFail($id);
-
-        return response()->json($product);
+        return $this->success(Product::findOrFail($id));
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -69,14 +69,13 @@ class ProductController extends Controller
 
         $product->update($validated);
 
-        return response()->json($product);
+        return $this->success($product->fresh(), __('messages.updated'));
     }
 
     public function destroy(string $id): JsonResponse
     {
-        $product = Product::findOrFail($id);
-        $product->delete();
+        Product::findOrFail($id)->delete();
 
-        return response()->json(null, 204);
+        return $this->success(null, __('messages.deleted'));
     }
 }

@@ -18,7 +18,7 @@ class StatsController extends Controller
         $orderRevenue = (int) Order::whereIn('status', ['paid', 'shipped'])->sum('total');
         $bookingRevenue = (int) Booking::where('status', 'confirmed')->sum('total_price');
 
-        return response()->json([
+        return $this->success([
             'totalRevenue' => $memberSpend + $orderRevenue + $bookingRevenue,
             'activeMembers' => Member::where('status', 'active')->count(),
             'openCourts' => Court::where('status', '!=', 'closed')->count(),

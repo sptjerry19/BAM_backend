@@ -43,6 +43,6 @@ class OrderController extends Controller
             'items' => $items,
         ]);
 
-        return response()->json($order->load('member'), 201);
+        return $this->success($order->load('member'), __('messages.created'), 201);
     }
 }

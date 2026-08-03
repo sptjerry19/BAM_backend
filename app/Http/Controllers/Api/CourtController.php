@@ -9,9 +9,15 @@ use Illuminate\Http\Request;
 
 class CourtController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(Court::all());
+        $query = Court::query()->orderBy('name');
+
+        if ($request->filled('per_page')) {
+            return $this->success($query->paginate((int) $request->integer('per_page', 15)));
+        }
+
+        return $this->success($query->get());
     }
 
     public function store(Request $request): JsonResponse
@@ -33,16 +39,12 @@ class CourtController extends Controller
             'hours' => 'nullable|string|max:100',
         ]);
 
-        $court = Court::create($validated);
-
-        return response()->json($court, 201);
+        return $this->success(Court::create($validated), __('messages.created'), 201);
     }
 
     public function show(string $id): JsonResponse
     {
-        $court = Court::findOrFail($id);
-
-        return response()->json($court);
+        return $this->success(Court::findOrFail($id));
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -67,14 +69,13 @@ class CourtController extends Controller
 
         $court->update($validated);
 
-        return response()->json($court);
+        return $this->success($court->fresh(), __('messages.updated'));
     }
 
     public function destroy(string $id): JsonResponse
     {
-        $court = Court::findOrFail($id);
-        $court->delete();
+        Court::findOrFail($id)->delete();
 
-        return response()->json(null, 204);
+        return $this->success(null, __('messages.deleted'));
     }
 }

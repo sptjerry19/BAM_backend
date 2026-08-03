@@ -357,5 +357,23 @@ class DatabaseSeeder extends Seeder
         foreach ($members as $member) {
             Member::create($member);
         }
+
+        \App\Models\User::create([
+            'name' => 'Admin',
+            'email' => 'admin@badminton.local',
+            'password' => 'password123',
+            'role' => 'admin',
+            'member_id' => null,
+        ]);
+
+        \App\Models\User::create([
+            'name' => 'Nguyễn Văn An',
+            'email' => 'nvan.an@gmail.com',
+            'password' => 'password123',
+            'role' => 'user',
+            'member_id' => 'm1',
+        ]);
+
+        $this->call(ProductReviewSeeder::class);
     }
 }

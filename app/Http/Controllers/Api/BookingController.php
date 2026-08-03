@@ -27,6 +27,6 @@ class BookingController extends Controller
 
         $booking = Booking::create($validated);
 
-        return response()->json($booking->load(['court', 'member']), 201);
+        return $this->success($booking->load(['court', 'member']), __('messages.created'), 201);
     }
 }
