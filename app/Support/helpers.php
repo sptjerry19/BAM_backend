@@ -28,6 +28,18 @@ if (! function_exists('upload_files')) {
     }
 }
 
+if (! function_exists('upload_base64')) {
+    /**
+     * Upload a base64 / data-URL image to the default disk (S3).
+     *
+     * @return array{path: string, url: string, disk: string, original_name: string, mime: string|null, size: int}
+     */
+    function upload_base64(string $base64, string $folder = 'uploads', ?string $disk = null): array
+    {
+        return app(FileUploadService::class)->uploadBase64($base64, $folder, $disk);
+    }
+}
+
 if (! function_exists('delete_uploaded_file')) {
     function delete_uploaded_file(?string $pathOrUrl, ?string $disk = null): bool
     {

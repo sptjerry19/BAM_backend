@@ -9,6 +9,8 @@ class MemberEquipment extends Model
 {
     public $incrementing = false;
 
+    protected $table = 'member_equipments';
+
     protected $keyType = 'string';
 
     protected $fillable = [

@@ -15,16 +15,26 @@ class MemberEquipmentController extends Controller
 
     public function index(string $member): JsonResponse
     {
-        return $this->success($this->equipments->listForMember($member));
+        $member = $this->equipments->listForMember($member);
+        if ($member) {
+            return $this->success($member);
+        }
+        return $this->error(__('messages.member_not_found'));
     }
 
     public function store(StoreMemberEquipmentRequest $request, string $member): JsonResponse
     {
+        $params = $request->validated();
+
+        $equipment = $this->equipments->create($member, $params);
+        if ($equipment) {
         return $this->success(
-            $this->equipments->create($member, $request->validated()),
-            __('messages.created'),
-            201
-        );
+                $equipment,
+                __('messages.created'),
+                201
+            );
+        }
+        return $this->error(__('messages.failed_to_create_equipment'));
     }
 
     public function destroy(string $id): JsonResponse

@@ -13,9 +13,6 @@ class AuthController extends Controller
 {
     public function __construct(private readonly AuthService $auth)
     {
-        $this->middleware('auth:api', [
-            'except' => ['login', 'register', 'forgotPassword', 'resetPassword'],
-        ]);
     }
 
     public function login(LoginRequest $request): JsonResponse

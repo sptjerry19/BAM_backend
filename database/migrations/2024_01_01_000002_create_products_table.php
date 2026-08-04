@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->string('name');
             $table->string('brand');
             $table->enum('category', ['racket', 'shoes', 'shirt', 'shorts', 'shuttlecock', 'bag', 'grip', 'string']);

@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
-            $table->string('court_id');
-            $table->string('member_id')->nullable();
+            $table->unsignedBigInteger('court_id');
+            $table->unsignedBigInteger('member_id')->nullable();
             $table->date('booking_date');
             $table->time('start_time');
             $table->decimal('hours', 4, 1);

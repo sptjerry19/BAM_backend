@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('courts', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->string('name');
             $table->string('address');
             $table->string('district');

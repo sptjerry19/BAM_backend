@@ -113,6 +113,61 @@ class FileUploadService
     }
 
     /**
+     * Upload an image from a data-URL (`data:image/png;base64,...`) or raw base64 string.
+     *
+     * @return array{path: string, url: string, disk: string, original_name: string, mime: string|null, size: int}
+     */
+    public function uploadBase64(
+        string $base64,
+        string $folder = 'uploads',
+        ?string $disk = null,
+        bool $public = false
+    ): array {
+        [$binary, $mime, $extension] = $this->decodeBase64Image($base64);
+
+        if (strlen($binary) > self::MAX_SIZE_KB * 1024) {
+            throw new InvalidArgumentException(__('messages.upload_too_large'));
+        }
+
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
+            throw new InvalidArgumentException(__('messages.upload_mime_invalid'));
+        }
+
+        $diskName = $this->disk($disk);
+        $folder = trim($folder, '/');
+        $filename = Str::uuid()->toString().'.'.$extension;
+        $path = ($folder !== '' ? $folder.'/' : '').$filename;
+
+        $options = [];
+        if ($diskName === 'public' || ($public && $diskName !== 's3')) {
+            $options['visibility'] = 'public';
+        }
+
+        try {
+            $stored = Storage::disk($diskName)->put($path, $binary, $options);
+        } catch (\Throwable $e) {
+            throw new RuntimeException(
+                __('messages.upload_failed').' '.$e->getMessage(),
+                0,
+                $e
+            );
+        }
+
+        if (! $stored) {
+            throw new RuntimeException(__('messages.upload_failed'));
+        }
+
+        return [
+            'path' => $path,
+            'url' => $this->url($path, $diskName),
+            'disk' => $diskName,
+            'original_name' => $filename,
+            'mime' => $mime,
+            'size' => strlen($binary),
+        ];
+    }
+
+    /**
      * Upload many files. Returns list of upload result arrays.
      *
      * @param  array<int, UploadedFile>  $files
@@ -225,5 +280,47 @@ class FileUploadService
         if ($mime && ! in_array($mime, self::ALLOWED_MIMES, true)) {
             throw new InvalidArgumentException(__('messages.upload_mime_invalid'));
         }
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string} [binary, mime, extension]
+     */
+    private function decodeBase64Image(string $input): array
+    {
+        $input = trim($input);
+        $mime = null;
+        $payload = $input;
+
+        if (preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s', $input, $matches)) {
+            $mime = strtolower($matches[1]);
+            $payload = $matches[2];
+        }
+
+        $binary = base64_decode($payload, true);
+        if ($binary === false || $binary === '') {
+            throw new InvalidArgumentException(__('messages.upload_invalid'));
+        }
+
+        if ($mime === null) {
+            $detected = (new \finfo(FILEINFO_MIME_TYPE))->buffer($binary) ?: '';
+            $mime = strtolower($detected);
+        }
+
+        if ($mime === 'image/jpg') {
+            $mime = 'image/jpeg';
+        }
+
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+        ];
+
+        if (! isset($extensions[$mime])) {
+            throw new InvalidArgumentException(__('messages.upload_mime_invalid'));
+        }
+
+        return [$binary, $mime, $extensions[$mime]];
     }
 }

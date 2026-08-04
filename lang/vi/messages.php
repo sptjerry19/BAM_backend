@@ -6,6 +6,8 @@ return [
     'updated' => 'Cập nhật thành công.',
     'deleted' => 'Xóa thành công.',
     'not_found' => 'Không tìm thấy dữ liệu.',
+    'member_not_found' => 'Thành viên không tồn tại.',
+    'failed_to_create_equipment' => 'Không thể tạo trang bị. Vui lòng thử lại.',
     'server_error' => 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
     'validation_error' => 'Dữ liệu gửi lên không hợp lệ.',
     'uploaded' => 'Tải lên thành công.',

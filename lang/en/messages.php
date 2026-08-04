@@ -6,6 +6,8 @@ return [
     'updated' => 'Updated successfully.',
     'deleted' => 'Deleted successfully.',
     'not_found' => 'Resource not found.',
+    'member_not_found' => 'Member not found.',
+    'failed_to_create_equipment' => 'Unable to create equipment. Please try again.',
     'server_error' => 'Something went wrong. Please try again later.',
     'validation_error' => 'The given data was invalid.',
     'uploaded' => 'Uploaded successfully.',

@@ -13,33 +13,43 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::group([
-    'middleware' => 'api',
-    'prefix' => 'auth',
+    'middleware' => 'api'
 ], function () {
+    // Public (no JWT)
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::post('/refresh', [AuthController::class, 'refresh']);
-    Route::get('/me', [AuthController::class, 'me']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
-    Route::post('/uploads', [UploadController::class, 'store']);
+    // Authenticated
+    Route::middleware('auth:api')->group(function () {
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/refresh', [AuthController::class, 'refresh']);
+        Route::get('/me', [AuthController::class, 'me']);
 
-    Route::get('/stats', [StatsController::class, 'index']);
+        Route::apiResource('courts', CourtController::class)->only(['index', 'show']);
+        Route::apiResource('products', ProductController::class)->only(['index', 'show']);
+        Route::get('/products/{product}/reviews', [ProductReviewController::class, 'index']);
+        Route::post('/products/{product}/reviews', [ProductReviewController::class, 'store']);
 
-    Route::apiResource('courts', CourtController::class);
-    Route::apiResource('products', ProductController::class);
-    Route::get('/products/{product}/reviews', [ProductReviewController::class, 'index']);
-    Route::post('/products/{product}/reviews', [ProductReviewController::class, 'store']);
+        Route::get('/members/{member}', [MemberController::class, 'show']);
+        Route::get('/members/{member}/custom-equipments', [MemberEquipmentController::class, 'index']);
+        Route::post('/members/{member}/custom-equipments', [MemberEquipmentController::class, 'store']);
+        Route::post('/members/{member}/equipment/{product}', [MemberController::class, 'attachEquipment']);
+        Route::delete('/members/{member}/equipment/{product}', [MemberController::class, 'detachEquipment']);
+        Route::delete('/custom-equipments/{id}', [MemberEquipmentController::class, 'destroy']);
 
-    Route::apiResource('members', MemberController::class)->only(['index', 'show']);
-    Route::get('/members/{member}/custom-equipments', [MemberEquipmentController::class, 'index']);
-    Route::post('/members/{member}/custom-equipments', [MemberEquipmentController::class, 'store']);
-    Route::post('/members/{member}/equipment/{product}', [MemberController::class, 'attachEquipment']);
-    Route::delete('/members/{member}/equipment/{product}', [MemberController::class, 'detachEquipment']);
-    Route::delete('/custom-equipments/{id}', [MemberEquipmentController::class, 'destroy']);
+        Route::post('/bookings', [BookingController::class, 'store']);
+        Route::post('/orders', [OrderController::class, 'store']);
 
-    Route::post('/bookings', [BookingController::class, 'store']);
-    Route::post('/orders', [OrderController::class, 'store']);
+        // Admin only
+        Route::middleware('admin')->group(function () {
+            Route::get('/stats', [StatsController::class, 'index']);
+            Route::post('/uploads', [UploadController::class, 'store']);
+            Route::get('/members', [MemberController::class, 'index']);
+
+            Route::apiResource('courts', CourtController::class)->only(['store', 'update', 'destroy']);
+            Route::apiResource('products', ProductController::class)->only(['store', 'update', 'destroy']);
+        });
+    });
 });

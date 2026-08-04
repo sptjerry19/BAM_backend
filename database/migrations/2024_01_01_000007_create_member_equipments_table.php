@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('member_equipments', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('member_id')->index();
+            $table->id();
+            $table->unsignedBigInteger('member_id')->index();
             $table->string('name');
             $table->string('brand')->nullable();
             $table->enum('category', ['racket', 'shoes', 'shirt', 'shorts', 'bag', 'grip', 'other', 'shuttlecock', 'string']);
