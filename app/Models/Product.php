@@ -19,6 +19,7 @@ class Product extends Model
         'price',
         'original_price',
         'image',
+        'images',
         'stock',
         'rating',
         'reviews',
@@ -33,6 +34,7 @@ class Product extends Model
         'rating' => 'float',
         'reviews' => 'integer',
         'featured' => 'boolean',
+        'images' => 'array',
     ];
 
     public function productReviews(): HasMany

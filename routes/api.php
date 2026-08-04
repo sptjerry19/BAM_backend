@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductReviewController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,8 @@ Route::group([
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+
+    Route::post('/uploads', [UploadController::class, 'store']);
 
     Route::get('/stats', [StatsController::class, 'index']);
 
