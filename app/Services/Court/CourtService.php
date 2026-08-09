@@ -13,10 +13,19 @@ class CourtService
      */
     public function list(array $filters): Collection|LengthAwarePaginator
     {
+        $status = $filters['status'] ?? null;
         $query = Court::query()->orderBy('name');
 
         if (! empty($filters['per_page'])) {
             return $query->paginate((int) $filters['per_page']);
+        }
+
+        $user = auth()->user();
+        if (! $user || $user->role !== 'admin') {
+            if ($status) {
+                $query->where('status', $status);
+            }
+            $query->limit(5);
         }
 
         return $query->get();

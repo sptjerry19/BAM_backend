@@ -2,6 +2,7 @@
 
 namespace App\Services\Product;
 
+use App\Models\Order;
 use App\Models\Product;
 use App\Services\Storage\FileUploadService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -22,21 +23,36 @@ class ProductService
     public function list(array $filters): Collection|LengthAwarePaginator
     {
         $query = Product::query();
+        if (! empty($filters['search'])) {
+            $query->where(function ($query) use ($filters) {
+                $query->where('name', 'like', '%'.$filters['search'].'%');
+            });
+        }
+
 
         if (! empty($filters['category'])) {
             $query->where('category', $filters['category']);
         }
 
-        if (! empty($filters['per_page'])) {
-            return $query->paginate((int) $filters['per_page']);
-        }
-
-        return $query->get();
+        return $query->paginate((int) ($filters['per_page'] ?? config('const.limit')));
     }
 
     public function findOrFail(string $id): Product
     {
         return Product::findOrFail($id);
+    }
+
+    /**
+     * Top sellers by qty in paid/shipped orders; fill with featured/rating if short.
+     *
+     * @return Collection<int, Product>
+     */
+    public function bestsellers(int $limit = 5): Collection
+    {
+        $limit = max(1, min($limit, 20));
+
+       $products = Product::orderBy('sold_count', 'desc')->limit($limit)->get();
+       return $products;
     }
 
     public function create(array $data, Request $request): Product

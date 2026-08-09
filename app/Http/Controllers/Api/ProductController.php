@@ -17,7 +17,14 @@ class ProductController extends Controller
 
     public function index(IndexProductRequest $request): JsonResponse
     {
-        return $this->success($this->products->list($request->validated()));
+        $params = $request->validated();
+        $products = $this->products->list($params);
+        return $this->success($products);
+    }
+
+    public function bestsellers(): JsonResponse
+    {
+        return $this->success($this->products->bestsellers(5));
     }
 
     public function store(StoreProductRequest $request): JsonResponse

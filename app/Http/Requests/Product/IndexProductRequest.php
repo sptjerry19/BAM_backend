@@ -17,7 +17,9 @@ class IndexProductRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'search' => 'nullable|string|max:255',
             'category' => 'nullable|string|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string',
+            'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:100',
         ];
     }

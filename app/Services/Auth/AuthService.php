@@ -30,14 +30,14 @@ class AuthService
      */
     public function register(array $data): array
     {
-        $memberId = 'm_'.Str::lower(Str::random(10));
+        $memberId = 'm_' . Str::lower(Str::random(10));
 
         $member = Member::create([
             'id' => $memberId,
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
-            'avatar' => 'https://i.pravatar.cc/150?u='.urlencode($data['email']),
+            'avatar' => 'https://i.pravatar.cc/150?u=' . urlencode($data['email']),
             'level' => 'beginner',
             'points' => 0,
             'matches' => 0,
@@ -126,7 +126,7 @@ class AuthService
             return 'reset_invalid';
         }
 
-        if ($row->created_at && now()->diffInMinutes($row->created_at) > 60) {
+        if ($row->created_at && now()->diffInMinutes($row->created_at, true) > 60) {
             DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
 
             return 'reset_expired';
