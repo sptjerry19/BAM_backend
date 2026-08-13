@@ -24,9 +24,9 @@ class StatsService
             'memberCount' => Member::count(),
             'courtCount' => Court::count(),
             'productCount' => Product::count(),
-            'activeMembersList' => Member::where('status', 'active')->get(),
-            'courtStatuses' => Court::select('id', 'name', 'status')->get(),
-            'featuredProducts' => Product::where('featured', true)->get(),
+            'activeMembersList' => Member::where('status', 'active')->take(12)->get(),
+            'courtStatuses' => Court::select('id', 'name', 'status')->take(12)->get(),
+            'featuredProducts' => Product::where('featured', true)->take(12)->get(),
         ];
     }
 }

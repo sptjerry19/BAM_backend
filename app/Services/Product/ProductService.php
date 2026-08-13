@@ -2,39 +2,158 @@
 
 namespace App\Services\Product;
 
-use App\Models\Order;
 use App\Models\Product;
 use App\Services\Storage\FileUploadService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Matchish\ScoutElasticSearch\Engines\ElasticSearchEngine;
 
 class ProductService
 {
+    private const LIST_COUNT_TTL_SECONDS = 60;
+
+    private const LIST_COLUMNS = [
+        'id',
+        'name',
+        'brand',
+        'category',
+        'price',
+        'original_price',
+        'image',
+        'images',
+        'stock',
+        'rating',
+        'reviews',
+        'featured',
+        'sold_count',
+        'created_at',
+    ];
+
     public function __construct(private readonly FileUploadService $uploads)
     {
     }
 
     /**
-     * @return Collection<int, Product>|LengthAwarePaginator
+     * Catalog list. Text search uses OpenSearch (Scout) when configured;
+     * browse-without-search stays on MySQL + cached COUNT(*).
      */
-    public function list(array $filters): Collection|LengthAwarePaginator
+    public function list(array $filters): LengthAwarePaginator
     {
-        $query = Product::query();
-        if (! empty($filters['search'])) {
-            $query->where(function ($query) use ($filters) {
-                $query->where('name', 'like', '%'.$filters['search'].'%');
+        $perPage = max(1, min(
+            (int) ($filters['per_page'] ?? config('const.limit', 12)),
+            100
+        ));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $search = trim((string) ($filters['search'] ?? ''));
+        $category = ! empty($filters['category']) ? (string) $filters['category'] : null;
+
+        if ($search !== '' && $this->openSearchEnabled()) {
+            return $this->listViaOpenSearch($search, $category, $perPage, $page);
+        }
+
+        $query = Product::query()->select(self::LIST_COLUMNS);
+
+        if ($search !== '') {
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('brand', 'like', '%'.$search.'%');
             });
         }
 
-
-        if (! empty($filters['category'])) {
-            $query->where('category', $filters['category']);
+        if ($category !== null) {
+            $query->where('category', $category);
         }
 
-        return $query->paginate((int) ($filters['per_page'] ?? config('const.limit')));
+        // Stable order → PK/index friendly; avoids filesort on large catalogs.
+        $query->orderByDesc('id');
+
+        $total = $this->resolveListTotal(clone $query, $search, $category);
+
+        $items = $query->forPage($page, $perPage)->get();
+
+        return new Paginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ]
+        );
+    }
+
+    private function openSearchEnabled(): bool
+    {
+        // Name kept for BC — means Scout Elasticsearch engine is configured
+        return config('scout.driver') === ElasticSearchEngine::class
+            && filled(config('elasticsearch.host'));
+    }
+
+    private function listViaOpenSearch(
+        string $search,
+        ?string $category,
+        int $perPage,
+        int $page
+    ): LengthAwarePaginator {
+        $builder = Product::search($search);
+
+        if ($category !== null) {
+            $builder->where('category', $category);
+        }
+
+        /** @var LengthAwarePaginator $results */
+        $results = $builder->paginate($perPage, 'page', $page);
+
+        return $results;
+    }
+
+    /**
+     * COUNT(*) on full table is expensive; cache when filters are stable (no free-text search).
+     */
+    private function resolveListTotal(Builder $query, string $search, ?string $category): int
+    {
+        if ($search !== '') {
+            return (int) $query->toBase()->getCountForPagination();
+        }
+
+        $key = $this->listCountCacheKey($category);
+
+        return (int) Cache::remember(
+            $key,
+            self::LIST_COUNT_TTL_SECONDS,
+            static fn () => (int) $query->toBase()->getCountForPagination()
+        );
+    }
+
+    private function listCountCacheKey(?string $category): string
+    {
+        return 'products:list_count:'.($category ?: 'all');
+    }
+
+    private function forgetListCountCache(?string $category = null): void
+    {
+        Cache::forget($this->listCountCacheKey(null));
+
+        $categories = [
+            'racket', 'shoes', 'shirt', 'shorts', 'shuttlecock', 'bag', 'grip', 'string',
+        ];
+
+        if ($category !== null) {
+            Cache::forget($this->listCountCacheKey($category));
+
+            return;
+        }
+
+        foreach ($categories as $cat) {
+            Cache::forget($this->listCountCacheKey($cat));
+        }
     }
 
     public function findOrFail(string $id): Product
@@ -43,16 +162,18 @@ class ProductService
     }
 
     /**
-     * Top sellers by qty in paid/shipped orders; fill with featured/rating if short.
-     *
      * @return Collection<int, Product>
      */
     public function bestsellers(int $limit = 5): Collection
     {
         $limit = max(1, min($limit, 20));
 
-       $products = Product::orderBy('sold_count', 'desc')->limit($limit)->get();
-       return $products;
+        return Product::query()
+            ->select(self::LIST_COLUMNS)
+            ->orderByDesc('sold_count')
+            ->orderByDesc('featured')
+            ->limit($limit)
+            ->get();
     }
 
     public function create(array $data, Request $request): Product
@@ -63,7 +184,7 @@ class ProductService
             'products'
         );
 
-        return Product::create([
+        $product = Product::create([
             'id' => $data['id'] ?? ('p_'.Str::lower(Str::random(10))),
             'name' => $data['name'],
             'brand' => $data['brand'],
@@ -78,6 +199,10 @@ class ProductService
             'description' => $data['description'] ?? null,
             'featured' => filter_var($data['featured'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ]);
+
+        $this->forgetListCountCache($product->category);
+
+        return $product;
     }
 
     public function update(Product $product, array $data, Request $request): Product
@@ -85,6 +210,8 @@ class ProductService
         $touchingImages = $request->hasFile('image_files')
             || $request->has('keep_images')
             || array_key_exists('images', $data);
+
+        $previousCategory = $product->category;
 
         if ($touchingImages) {
             $kept = $request->input('keep_images', $product->images ?? []);
@@ -125,11 +252,19 @@ class ProductService
         unset($data['keep_images'], $data['image_files']);
         $product->update($data);
 
-        return $product->fresh();
+        $fresh = $product->fresh();
+        $this->forgetListCountCache($previousCategory);
+        if ($fresh && $fresh->category !== $previousCategory) {
+            $this->forgetListCountCache($fresh->category);
+        }
+
+        return $fresh;
     }
 
     public function delete(Product $product): void
     {
+        $category = $product->category;
+
         $this->uploads->deleteMany($product->images ?? []);
 
         if ($product->image && ! in_array($product->image, $product->images ?? [], true)) {
@@ -137,6 +272,7 @@ class ProductService
         }
 
         $product->delete();
+        $this->forgetListCountCache($category);
     }
 
     /**

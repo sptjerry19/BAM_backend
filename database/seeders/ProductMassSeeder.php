@@ -45,7 +45,7 @@ class ProductMassSeeder extends Seeder
         'photo-1626224583764-f87db24ac4ea',
         'photo-1617802690992-15d93263d3a9',
         'photo-1617802690992-15d93263d3a9',
-        'photo-1554068865-24cecd4e340b',
+        'photo-1617802690992-15d93263d3a9',
     ];
 
     public function run(): void
