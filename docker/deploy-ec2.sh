@@ -71,9 +71,10 @@ docker compose ps
 
 IP="$(curl -s ifconfig.me 2>/dev/null || echo YOUR_EC2_IP)"
 echo ""
-echo "Done. Backend API only (FE is a separate repo)."
-echo "  API:  http://${IP}/api"
-echo "  FE:   set VITE_API_URL=http://${IP}/api when building frontend"
+echo "Done. Backend API (internal + optional :8080)."
+echo "  API debug: http://${IP}:8080/api"
+echo "  Next: deploy FE on port 80 (joins network jb_net, proxies /api -> api)"
+echo "  Site will be: http://${IP}/"
 echo ""
 echo "Useful:"
 echo "  docker compose logs -f backend"

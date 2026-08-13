@@ -1,49 +1,24 @@
 # Docker — Backend API
 
-Stack: nginx + php-fpm + MySQL + Redis + Elasticsearch.
+Stack: **api** (nginx) + php-fpm + MySQL + Redis + Elasticsearch.
 
-Dùng **một file `.env`** (không còn `.env.docker`).  
-Trong container, compose **ghi đè** `DB_HOST=mysql`, `REDIS_HOST=redis`, `ELASTICSEARCH_HOST=...` nên `.env` local vẫn có thể để `DB_HOST=127.0.0.1` khi chạy `php artisan serve`.
+Mạng cố định: **`jb_net`** (FE join vào đây để proxy `/api`).
 
-FE repo riêng: `VITE_API_URL=http://API_HOST/api`.
+- Host **80** → để cho **frontend**
+- Backend API publish mặc định **8080** (debug) + nội bộ tên service `api`
 
-## Chạy local
+## Chạy
 
-### Windows (PowerShell)
-
-```powershell
+```bash
 cd backend
-.\docker\up.ps1
-```
-
-```powershell
+# .env: APP_PORT=8080
 docker compose --env-file .env up -d --build
 ```
 
-### Linux / macOS / EC2
+Rồi chạy FE (repo riêng) trên port 80 — xem `frontend/DOCKER.md`.
+
+## Deploy EC2
 
 ```bash
-cd backend
-bash docker/up.sh
-# hoặc
 bash docker/deploy-ec2.sh
-```
-
-API: http://localhost/api
-
-## Biến Docker thêm trong `.env` (tuỳ chọn)
-
-```env
-DB_ROOT_PASSWORD=rootsecret
-RUN_SCOUT_IMPORT=true
-APP_PORT=80
-ES_JAVA_OPTS=-Xms256m -Xmx256m
-```
-
-## Lệnh hữu ích
-
-```bash
-docker compose --env-file .env logs -f backend
-docker compose --env-file .env exec backend php artisan scout:import "App\\Models\\Product"
-docker compose --env-file .env down
 ```
