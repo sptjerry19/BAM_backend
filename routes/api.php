@@ -12,6 +12,12 @@ use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return response()->json([
+        'message' => 'Welcome to the API',
+    ]);
+});
+
 Route::group([
     'middleware' => 'api',
 ], function () {
