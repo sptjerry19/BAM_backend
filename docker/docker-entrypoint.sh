@@ -3,12 +3,12 @@ set -e
 
 cd /var/www/html
 
-echo "[entrypoint] waiting for database..."
+echo "[entrypoint] waiting for database (user=$(printenv DB_USERNAME) host=$(printenv DB_HOST) db=$(printenv DB_DATABASE))..."
 i=0
-until php -r "try { new PDO('mysql:host=' . getenv('DB_HOST') . ';port=' . (getenv('DB_PORT') ?: '3306') . ';dbname=' . getenv('DB_DATABASE'), getenv('DB_USERNAME'), getenv('DB_PASSWORD') ?: null); exit(0);} catch (Throwable \$e) { exit(1);}"; do
+until php -r "try { new PDO('mysql:host=' . getenv('DB_HOST') . ';port=' . (getenv('DB_PORT') ?: '3306') . ';dbname=' . getenv('DB_DATABASE'), getenv('DB_USERNAME'), getenv('DB_PASSWORD') ?: ''); exit(0);} catch (Throwable \$e) { fwrite(STDERR, \$e->getMessage() . PHP_EOL); exit(1);}"; do
   i=$((i + 1))
   if [ "$i" -ge 90 ]; then
-    echo "[entrypoint] database not ready after 90s" >&2
+    echo "[entrypoint] database not ready after 90s — check DB_USERNAME/DB_PASSWORD in .env (Docker needs non-empty password; avoid root with blank password)" >&2
     exit 1
   fi
   sleep 1
@@ -17,6 +17,8 @@ done
 mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs storage/app/public bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R ug+rwx storage bootstrap/cache
+# `docker compose exec` runs artisan as root and can leave root-owned log files behind.
+find storage/logs -type f -name '*.log' -exec chmod 666 {} + 2>/dev/null || true
 
 php artisan config:clear || true
 php artisan storage:link 2>/dev/null || true

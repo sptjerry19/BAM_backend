@@ -26,6 +26,13 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
+      # `artisan` run as root leaves laravel.log unwritable for php-fpm's www-data,
+      # which turns every logged exception into an opaque 500.
+      LOG_CHANNEL: stderr
+      # Force app user inside Docker (local .env often has root + blank password)
+      DB_DATABASE: ${DB_DATABASE:-jbam}
+      DB_USERNAME: jbam
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
       REDIS_HOST: redis
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       ELASTICSEARCH_SSL_VERIFICATION: "false"
@@ -50,7 +57,7 @@ services:
     image: mysql:8.4
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-jbam}
-      MYSQL_USER: ${DB_USERNAME:-jbam}
+      MYSQL_USER: jbam
       MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootsecret}
     volumes:
@@ -76,7 +83,7 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       xpack.security.http.ssl.enabled: "false"
-      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms256m -Xmx256m}
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms512m -Xmx512m}
       cluster.routing.allocation.disk.threshold_enabled: "false"
     volumes:
       - es_data:/usr/share/elasticsearch/data

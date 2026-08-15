@@ -4,8 +4,17 @@ Stack: **api** (nginx) + php-fpm + MySQL + Redis + Elasticsearch.
 
 Mạng cố định: **`jb_net`** (FE join vào đây để proxy `/api`).
 
-- Host **80** → để cho **frontend**
+- Host **80/443** → để cho **frontend** (SSL: https://jbam.id.vn)
 - Backend API publish mặc định **8080** (debug) + nội bộ tên service `api`
+- Production `.env`: `APP_URL=https://jbam.id.vn`
+- Docker DB (không dùng `root` + password trống như local XAMPP):
+
+```env
+DB_DATABASE=jbam
+DB_USERNAME=jbam
+DB_PASSWORD=secret
+DB_ROOT_PASSWORD=rootsecret
+```
 
 ## Chạy
 

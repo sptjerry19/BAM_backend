@@ -11,12 +11,17 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Matchish\ScoutElasticSearch\Engines\ElasticSearchEngine;
+use Throwable;
 
 class ProductService
 {
     private const LIST_COUNT_TTL_SECONDS = 60;
+
+    /** Must stay <= the index `max_result_window` in config/elasticsearch.php. */
+    private const SEARCH_RESULT_CAP = 50000;
 
     private const LIST_COLUMNS = [
         'id',
@@ -54,7 +59,15 @@ class ProductService
         $category = ! empty($filters['category']) ? (string) $filters['category'] : null;
 
         if ($search !== '' && $this->openSearchEnabled()) {
-            return $this->listViaOpenSearch($search, $category, $perPage, $page);
+            try {
+                return $this->listViaOpenSearch($search, $category, $perPage, $page);
+            } catch (Throwable $e) {
+                // A degraded search beats a broken catalog page.
+                Log::warning('Elasticsearch product search failed, falling back to MySQL', [
+                    'search' => $search,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $query = Product::query()->select(self::LIST_COLUMNS);
@@ -102,16 +115,81 @@ class ProductService
         int $perPage,
         int $page
     ): LengthAwarePaginator {
-        $builder = Product::search($search);
+        $page = min($page, max(1, intdiv(self::SEARCH_RESULT_CAP, $perPage)));
 
-        if ($category !== null) {
-            $builder->where('category', $category);
-        }
+        $builder = Product::search($search, function ($client, $body) use ($search, $category) {
+            $window = $body->toArray();
+
+            return $client->search([
+                'index' => (new Product)->searchableAs(),
+                'body' => array_filter([
+                    'query' => $this->searchQuery($search, $category),
+                    'track_total_hits' => self::SEARCH_RESULT_CAP,
+                    'from' => $window['from'] ?? null,
+                    'size' => $window['size'] ?? null,
+                ], static fn ($value) => $value !== null),
+            ])->asArray();
+        });
 
         /** @var LengthAwarePaginator $results */
         $results = $builder->paginate($perPage, 'page', $page);
 
         return $results;
+    }
+
+    /**
+     * Scout's default engine sends the raw term as a `query_string`, so a shopper
+     * typing `"`, `+` or `AND` triggers an Elasticsearch parse error.
+     *
+     * @return array<string, mixed>
+     */
+    private function searchQuery(string $search, ?string $category): array
+    {
+        $bool = [
+            'should' => [
+                [
+                    'multi_match' => [
+                        'query' => $search,
+                        'type' => 'best_fields',
+                        'fields' => ['name^5', 'brand^3', 'category^2', 'description'],
+                        'operator' => 'and',
+                        'fuzziness' => 'AUTO',
+                        'prefix_length' => 1,
+                    ],
+                ],
+                [
+                    // Keeps results useful mid-word: "astro" still finds "Astrox".
+                    'multi_match' => [
+                        'query' => $search,
+                        'type' => 'phrase_prefix',
+                        'fields' => ['name^6', 'brand^4'],
+                    ],
+                ],
+            ],
+            'minimum_should_match' => 1,
+        ];
+
+        if ($category !== null) {
+            $bool['filter'] = [['term' => ['category' => $category]]];
+        }
+
+        return [
+            'function_score' => [
+                'query' => ['bool' => $bool],
+                'functions' => [
+                    [
+                        'field_value_factor' => [
+                            'field' => 'sold_count',
+                            'modifier' => 'log1p',
+                            'missing' => 0,
+                        ],
+                        'weight' => 0.3,
+                    ],
+                ],
+                'score_mode' => 'sum',
+                'boost_mode' => 'sum',
+            ],
+        ];
     }
 
     /**
