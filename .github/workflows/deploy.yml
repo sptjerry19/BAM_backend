@@ -25,6 +25,9 @@ jobs:
             set -euo pipefail
             cd /home/ubuntu/BAM_backend
 
+            # Repo may have been cloned as root; Git 2.35+ blocks that for ubuntu.
+            git config --global --add safe.directory /home/ubuntu/BAM_backend
+
             echo "==> Pull latest"
             git fetch origin
             DEFAULT_BRANCH="$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')"
