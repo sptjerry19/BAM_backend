@@ -1,0 +1,112 @@
+services:
+  # Internal API gateway only — FE publishes host port 80
+  api:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - backend_storage:/var/www/html/storage:ro
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      jb_net:
+        aliases:
+          - api
+    # Optional direct API access for debug: APP_PORT=8080
+    ports:
+      - "${APP_PORT:-8080}:80"
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      # `artisan` run as root leaves laravel.log unwritable for php-fpm's www-data,
+      # which turns every logged exception into an opaque 500.
+      LOG_CHANNEL: stderr
+      # Force app user inside Docker (local .env often has root + blank password)
+      DB_DATABASE: ${DB_DATABASE:-jbam}
+      DB_USERNAME: jbam
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      REDIS_HOST: redis
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+      ELASTICSEARCH_SSL_VERIFICATION: "false"
+      SCOUT_DRIVER: "Matchish\\ScoutElasticSearch\\Engines\\ElasticSearchEngine"
+      SCOUT_PREFIX: jb_
+      SCOUT_QUEUE: "false"
+      RUN_SCOUT_IMPORT: "${RUN_SCOUT_IMPORT:-false}"
+    volumes:
+      - backend_storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - jb_net
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-jbam}
+      MYSQL_USER: jbam
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootsecret}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD:-rootsecret}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - jb_net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - jb_net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.5
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms512m -Xmx512m}
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - jb_net
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+volumes:
+  mysql_data:
+  es_data:
+  backend_storage:
+
+networks:
+  jb_net:
+    name: jb_net
+    driver: bridge

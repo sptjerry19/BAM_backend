@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('product_reviews', function (Blueprint $table) {
             $table->id();
-            $table->string('product_id')->index();
-            $table->string('member_id')->nullable()->index();
+            $table->unsignedBigInteger('product_id')->index();
+            $table->unsignedBigInteger('member_id')->nullable()->index();
             $table->string('user_name');
             $table->string('avatar')->nullable();
             $table->unsignedTinyInteger('rating');

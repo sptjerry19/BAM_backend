@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Scout\Searchable;
 
 class Product extends Model
 {
+    use Searchable;
+
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -19,11 +22,13 @@ class Product extends Model
         'price',
         'original_price',
         'image',
+        'images',
         'stock',
         'rating',
         'reviews',
         'description',
         'featured',
+        'sold_count',
     ];
 
     protected $casts = [
@@ -33,7 +38,33 @@ class Product extends Model
         'rating' => 'float',
         'reviews' => 'integer',
         'featured' => 'boolean',
+        'sold_count' => 'integer',
+        'images' => 'array',
     ];
+
+    public function searchableAs(): string
+    {
+        return 'products';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (string) $this->id,
+            'name' => (string) $this->name,
+            'brand' => (string) $this->brand,
+            'category' => (string) $this->category,
+            'description' => (string) ($this->description ?? ''),
+            'price' => (int) $this->price,
+            'sold_count' => (int) ($this->sold_count ?? 0),
+            'featured' => (bool) $this->featured,
+            'rating' => (float) $this->rating,
+            'stock' => (int) $this->stock,
+        ];
+    }
 
     public function productReviews(): HasMany
     {

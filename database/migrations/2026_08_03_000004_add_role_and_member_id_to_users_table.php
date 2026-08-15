@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->string('role')->default('user')->after('email');
-            $table->string('member_id')->nullable()->after('role');
+            $table->unsignedBigInteger('member_id')->nullable()->after('role');
             $table->foreign('member_id')->references('id')->on('members')->nullOnDelete();
         });
     }

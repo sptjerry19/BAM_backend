@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         $courts = [
             [
-                'id' => 'c1',
+                'id' => 1,
                 'name' => 'Sân Cầu Lông Hoàng Mai',
                 'address' => '45 Hoàng Mai, Hà Nội',
                 'district' => 'Hoàng Mai',
@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
                 'hours' => '6:00 - 22:00',
             ],
             [
-                'id' => 'c2',
+                'id' => 2,
                 'name' => 'CLB Cầu Lông Đống Đa',
                 'address' => '12 Xã Đàn, Đống Đa, Hà Nội',
                 'district' => 'Đống Đa',
@@ -45,7 +45,7 @@ class DatabaseSeeder extends Seeder
                 'hours' => '5:30 - 23:00',
             ],
             [
-                'id' => 'c3',
+                'id' => 3,
                 'name' => 'Sân Cầu Lông Cầu Giấy',
                 'address' => '78 Trần Thái Tông, Cầu Giấy, Hà Nội',
                 'district' => 'Cầu Giấy',
@@ -61,7 +61,7 @@ class DatabaseSeeder extends Seeder
                 'hours' => '6:00 - 22:30',
             ],
             [
-                'id' => 'c4',
+                'id' => 4,
                 'name' => 'Thể Thao Thanh Xuân',
                 'address' => '156 Nguyễn Tuân, Thanh Xuân, Hà Nội',
                 'district' => 'Thanh Xuân',
@@ -77,7 +77,7 @@ class DatabaseSeeder extends Seeder
                 'hours' => '6:00 - 22:00',
             ],
             [
-                'id' => 'c5',
+                'id' => 5,
                 'name' => 'Sân Cầu Lông Long Biên',
                 'address' => '23 Ngọc Lâm, Long Biên, Hà Nội',
                 'district' => 'Long Biên',
@@ -93,7 +93,7 @@ class DatabaseSeeder extends Seeder
                 'hours' => '7:00 - 21:00',
             ],
             [
-                'id' => 'c6',
+                'id' => 6,
                 'name' => 'Olympic Badminton Center',
                 'address' => '99 Láng Hạ, Ba Đình, Hà Nội',
                 'district' => 'Ba Đình',
@@ -116,7 +116,7 @@ class DatabaseSeeder extends Seeder
 
         $products = [
             [
-                'id' => 'p1',
+                'id' => 1,
                 'name' => 'Yonex Astrox 88D Pro',
                 'brand' => 'Yonex',
                 'category' => 'racket',
@@ -130,7 +130,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => true,
             ],
             [
-                'id' => 'p2',
+                'id' => 2,
                 'name' => 'Victor Thruster K 9900',
                 'brand' => 'Victor',
                 'category' => 'racket',
@@ -144,7 +144,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => true,
             ],
             [
-                'id' => 'p3',
+                'id' => 3,
                 'name' => 'Yonex Power Cushion 65Z3',
                 'brand' => 'Yonex',
                 'category' => 'shoes',
@@ -158,7 +158,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => true,
             ],
             [
-                'id' => 'p4',
+                'id' => 4,
                 'name' => 'Li-Ning Aeronaut 9000',
                 'brand' => 'Li-Ning',
                 'category' => 'racket',
@@ -172,7 +172,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => false,
             ],
             [
-                'id' => 'p5',
+                'id' => 5,
                 'name' => 'Victor SH-A920 Shoes',
                 'brand' => 'Victor',
                 'category' => 'shoes',
@@ -186,7 +186,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => false,
             ],
             [
-                'id' => 'p6',
+                'id' => 6,
                 'name' => 'Yonex T-Shirt Tournament',
                 'brand' => 'Yonex',
                 'category' => 'shirt',
@@ -200,7 +200,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => false,
             ],
             [
-                'id' => 'p7',
+                'id' => 7,
                 'name' => 'Victor Shorts Pro Series',
                 'brand' => 'Victor',
                 'category' => 'shorts',
@@ -214,7 +214,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => false,
             ],
             [
-                'id' => 'p8',
+                'id' => 8,
                 'name' => 'Yonex AS-50 Shuttlecock (12 quả)',
                 'brand' => 'Yonex',
                 'category' => 'shuttlecock',
@@ -228,7 +228,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => true,
             ],
             [
-                'id' => 'p9',
+                'id' => 9,
                 'name' => 'Yonex Bag Pro Series 9829',
                 'brand' => 'Yonex',
                 'category' => 'bag',
@@ -242,7 +242,7 @@ class DatabaseSeeder extends Seeder
                 'featured' => false,
             ],
             [
-                'id' => 'p10',
+                'id' => 10,
                 'name' => 'Yonex Grip AC102EX',
                 'brand' => 'Yonex',
                 'category' => 'grip',
@@ -263,7 +263,7 @@ class DatabaseSeeder extends Seeder
 
         $members = [
             [
-                'id' => 'm1',
+                'id' => '1',
                 'name' => 'Nguyễn Văn An',
                 'email' => 'nvan.an@gmail.com',
                 'phone' => '0901 234 567',
@@ -275,10 +275,10 @@ class DatabaseSeeder extends Seeder
                 'total_cost' => 4500000,
                 'join_date' => '2023-01-15',
                 'status' => 'active',
-                'equipment' => ['p1', 'p3', 'p8'],
+                'equipment' => [1, 3, 8],
             ],
             [
-                'id' => 'm2',
+                'id' => '2',
                 'name' => 'Trần Thị Bích',
                 'email' => 'ttbich@gmail.com',
                 'phone' => '0912 345 678',
@@ -290,10 +290,10 @@ class DatabaseSeeder extends Seeder
                 'total_cost' => 2800000,
                 'join_date' => '2023-03-22',
                 'status' => 'active',
-                'equipment' => ['p2', 'p5', 'p6'],
+                'equipment' => [2, 5, 6],
             ],
             [
-                'id' => 'm3',
+                'id' => '3',
                 'name' => 'Lê Minh Tuấn',
                 'email' => 'lmtuan@gmail.com',
                 'phone' => '0923 456 789',
@@ -305,10 +305,10 @@ class DatabaseSeeder extends Seeder
                 'total_cost' => 8900000,
                 'join_date' => '2022-08-10',
                 'status' => 'active',
-                'equipment' => ['p4', 'p3', 'p9'],
+                'equipment' => [4, 3, 9],
             ],
             [
-                'id' => 'm4',
+                'id' => '4',
                 'name' => 'Phạm Thu Hà',
                 'email' => 'ptha@gmail.com',
                 'phone' => '0934 567 890',
@@ -320,10 +320,10 @@ class DatabaseSeeder extends Seeder
                 'total_cost' => 850000,
                 'join_date' => '2024-01-05',
                 'status' => 'active',
-                'equipment' => ['p5', 'p6'],
+                'equipment' => [5, 6],
             ],
             [
-                'id' => 'm5',
+                'id' => '5',
                 'name' => 'Hoàng Đức Mạnh',
                 'email' => 'hdmanh@gmail.com',
                 'phone' => '0945 678 901',
@@ -335,10 +335,10 @@ class DatabaseSeeder extends Seeder
                 'total_cost' => 3200000,
                 'join_date' => '2023-05-18',
                 'status' => 'inactive',
-                'equipment' => ['p2', 'p3'],
+                'equipment' => [2, 3],
             ],
             [
-                'id' => 'm6',
+                'id' => '6',
                 'name' => 'Vũ Thị Lan',
                 'email' => 'vtlan@gmail.com',
                 'phone' => '0956 789 012',
@@ -350,7 +350,7 @@ class DatabaseSeeder extends Seeder
                 'total_cost' => 5600000,
                 'join_date' => '2022-11-30',
                 'status' => 'active',
-                'equipment' => ['p1', 'p5', 'p9'],
+                'equipment' => [1, 5, 9],
             ],
         ];
 
@@ -371,7 +371,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'nvan.an@gmail.com',
             'password' => 'password123',
             'role' => 'user',
-            'member_id' => 'm1',
+            'member_id' => 1,
         ]);
 
         $this->call(ProductReviewSeeder::class);

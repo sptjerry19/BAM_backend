@@ -3,30 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\Court;
+use App\Http\Requests\Booking\StoreBookingRequest;
+use App\Services\Booking\BookingService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
-    public function store(Request $request): JsonResponse
+    public function __construct(private readonly BookingService $bookings)
     {
-        $validated = $request->validate([
-            'court_id' => 'required|string|exists:courts,id',
-            'member_id' => 'nullable|string|exists:members,id',
-            'booking_date' => 'required|date',
-            'start_time' => 'required|date_format:H:i',
-            'hours' => 'required|numeric|min:0.5|max:12',
-            'status' => 'nullable|in:pending,confirmed,cancelled',
-        ]);
+    }
 
-        $court = Court::findOrFail($validated['court_id']);
-        $validated['total_price'] = (int) ($court->price * $validated['hours']);
-        $validated['status'] = $validated['status'] ?? 'pending';
-
-        $booking = Booking::create($validated);
-
-        return $this->success($booking->load(['court', 'member']), __('messages.created'), 201);
+    public function store(StoreBookingRequest $request): JsonResponse
+    {
+        return $this->success(
+            $this->bookings->create($request->validated()),
+            __('messages.created'),
+            201
+        );
     }
 }

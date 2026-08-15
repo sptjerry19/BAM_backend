@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->string('member_id')->nullable();
+            $table->unsignedBigInteger('member_id')->nullable();
             $table->unsignedBigInteger('total');
             $table->enum('status', ['pending', 'paid', 'shipped'])->default('pending');
             $table->json('items');
