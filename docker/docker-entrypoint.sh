@@ -32,7 +32,9 @@ else
   php artisan migrate --force --no-interaction
 fi
 
-if [ "${RUN_SCOUT_IMPORT:-false}" = "true" ]; then
+# Never scout:import during deploy boot (SKIP_ENTRYPOINT_MIGRATE=true).
+# On ~1GB EC2, ES import + php-fpm + migrate OOM-kills artisan (exit 137).
+if [ "${RUN_SCOUT_IMPORT:-false}" = "true" ] && [ "${SKIP_ENTRYPOINT_MIGRATE:-false}" != "true" ]; then
   echo "[entrypoint] waiting for Elasticsearch..."
   j=0
   until php -r "\$h=getenv('ELASTICSEARCH_HOST')?:'http://elasticsearch:9200'; try { \$c=@file_get_contents(\$h); exit(\$c===false?1:0);} catch (Throwable \$e) { exit(1);}"; do
@@ -47,6 +49,8 @@ if [ "${RUN_SCOUT_IMPORT:-false}" = "true" ]; then
     echo "[entrypoint] importing Scout index..."
     php artisan scout:import "App\\Models\\Product" || true
   fi
+elif [ "${RUN_SCOUT_IMPORT:-false}" = "true" ]; then
+  echo "[entrypoint] RUN_SCOUT_IMPORT ignored during deploy boot — run scout:import manually after deploy"
 fi
 
 echo "[entrypoint] starting php-fpm"

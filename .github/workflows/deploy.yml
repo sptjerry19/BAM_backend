@@ -48,10 +48,25 @@ jobs:
             fi
             free -h
 
+            echo "==> Pin lean deploy flags in .env (override stale RUN_SCOUT_IMPORT=true)"
+            touch .env
+            for key in RUN_SCOUT_IMPORT SKIP_ENTRYPOINT_MIGRATE; do
+              grep -q "^${key}=" .env || echo "${key}=" >> .env
+            done
+            sed -i 's/^RUN_SCOUT_IMPORT=.*/RUN_SCOUT_IMPORT=false/' .env
+            sed -i 's/^SKIP_ENTRYPOINT_MIGRATE=.*/SKIP_ENTRYPOINT_MIGRATE=true/' .env
+            # Keep ES heap small if still set to 512m from older deploys.
+            if grep -q '^ES_JAVA_OPTS=' .env; then
+              sed -i 's/^ES_JAVA_OPTS=.*/ES_JAVA_OPTS="-Xms256m -Xmx256m"/' .env
+            else
+              echo 'ES_JAVA_OPTS="-Xms256m -Xmx256m"' >> .env
+            fi
+
             echo "==> Free disk/memory before build"
             docker image prune -f
 
-            echo "==> Build & restart stack (migrate deferred until php-fpm is up)"
+            echo "==> Build & restart stack (no scout import / no entrypoint migrate)"
+            export RUN_SCOUT_IMPORT=false
             export SKIP_ENTRYPOINT_MIGRATE=true
             docker compose --env-file .env up -d --build --remove-orphans
 
@@ -63,7 +78,6 @@ jobs:
                 ready=1
                 break
               fi
-              # Surface crash-loops early instead of waiting for SSH timeout.
               if ! docker compose ps backend --status running -q 2>/dev/null | grep -q .; then
                 echo "backend container is not running" >&2
                 docker compose ps
@@ -82,25 +96,42 @@ jobs:
               exit 1
             fi
 
+            echo "==> Pause Elasticsearch (~300–500MB) so migrate fits in 1GB RAM"
+            docker compose stop elasticsearch
+            free -h
+
             echo "==> Migrate"
+            migrate_ok=0
             for attempt in 1 2 3; do
-              if docker compose exec -T backend php artisan migrate --force --no-interaction; then
+              set +e
+              migrate_out="$(docker compose exec -T backend php artisan migrate --force --no-interaction 2>&1)"
+              migrate_rc=$?
+              set -e
+              echo "$migrate_out"
+              if [ "$migrate_rc" = "0" ]; then
+                migrate_ok=1
                 break
               fi
+              echo "Migrate attempt $attempt failed (exit $migrate_rc)" >&2
               if [ "$attempt" = "3" ]; then
-                echo "Migration failed 3x — memory snapshot below" >&2
                 free -h
                 docker compose ps
                 docker compose logs --tail 80 backend || true
                 sudo dmesg | tail -40 | grep -i -E 'oom|killed' || true
+                docker compose start elasticsearch || true
                 exit 1
               fi
-              echo "Migrate attempt $attempt failed, retrying in 15s..."
               sleep 15
             done
+
+            echo "==> Start Elasticsearch again"
+            docker compose start elasticsearch
 
             echo "==> Prune dangling images"
             docker image prune -f
 
             echo "==> Status"
             docker compose ps
+            free -h
+            echo "Scout reindex (optional, when RAM is free):"
+            echo "  docker compose exec backend php artisan scout:import \"App\\\\Models\\\\Product\""
