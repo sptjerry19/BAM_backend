@@ -25,10 +25,20 @@ class OrderService
             $total += $price * $qty;
         }
 
+        $method = $data['payment_method'] ?? 'cod';
+        // Real Apple Pay / MoMo gateways are not wired yet — keep pending until paid offline.
+        $status = $data['status'] ?? 'pending';
+
         return Order::create([
             'member_id' => $data['member_id'] ?? null,
+            'customer_name' => $data['customer_name'],
+            'customer_phone' => $data['customer_phone'],
+            'customer_email' => $data['customer_email'],
+            'shipping_address' => $data['shipping_address'],
+            'note' => $data['note'] ?? null,
+            'payment_method' => $method,
             'total' => $total,
-            'status' => $data['status'] ?? 'pending',
+            'status' => $status,
             'items' => $items,
         ])->load('member');
     }

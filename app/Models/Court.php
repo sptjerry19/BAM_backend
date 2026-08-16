@@ -24,6 +24,8 @@ class Court extends Model
         'image',
         'x',
         'y',
+        'lat',
+        'lng',
         'phone',
         'hours',
     ];
@@ -34,6 +36,8 @@ class Court extends Model
         'rating' => 'float',
         'x' => 'float',
         'y' => 'float',
+        'lat' => 'float',
+        'lng' => 'float',
     ];
 
     public function bookings(): HasMany

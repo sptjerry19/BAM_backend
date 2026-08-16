@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  */
 class ProductMassSeeder extends Seeder
 {
-    private const DEFAULT_COUNT = 1_000_000;
+    private const DEFAULT_COUNT = 1_000;
 
     private const CHUNK_SIZE = 1_000;
 
@@ -42,10 +42,27 @@ class ProductMassSeeder extends Seeder
     ];
 
     private const IMAGES = [
-        'photo-1626224583764-f87db24ac4ea',
-        'photo-1617802690992-15d93263d3a9',
-        'photo-1617802690992-15d93263d3a9',
-        'photo-1617802690992-15d93263d3a9',
+        'background1.jpg',
+        'background2.jpg',
+        'background3.jpg',
+        'background4.jpg',
+        'background5.jpg',
+        'background6.jpg',
+        'background7.jpg',
+        'background8.jpg',
+        'background9.jpg',
+        'background10.jpg',
+        'jacket1.webp',
+        'jacket2.webp',
+        'jacket3.webp',
+        'jacket4.jpg',
+        'jacket5.jpg',
+        'jacket6.webp',
+        'jacket7.jpg',
+        'jacket8.jpg',
+        'jacket9.webp',
+        'jacket10.webp',
+        'jacket11.webp'
     ];
 
     public function run(): void
@@ -68,7 +85,7 @@ class ProductMassSeeder extends Seeder
             $prefixPool = self::NAME_PREFIX[$category];
             $prefix = $prefixPool[($i - 1) % count($prefixPool)];
             $imageKey = self::IMAGES[($i - 1) % count(self::IMAGES)];
-            $imageUrl = "https://images.unsplash.com/{$imageKey}?w=400&h=300&fit=crop";
+            $imageUrl = "https://jbam.id.vn/src/assets/uploads/{$imageKey}?w=400&h=300&fit=crop";
 
             $basePrice = match ($category) {
                 'racket' => 800_000 + ($i % 50) * 70_000,
