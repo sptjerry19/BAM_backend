@@ -20,9 +20,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          # Build + ES/MySQL health + migrate on a 1GB box can exceed the 10m default.
           command_timeout: 30m
-          script_stop: true
+          script_stop: false
           script: |
             set -euo pipefail
             cd /home/ubuntu/BAM_backend
@@ -36,7 +35,7 @@ jobs:
             git checkout "$DEFAULT_BRANCH"
             git reset --hard "origin/$DEFAULT_BRANCH"
 
-            echo "==> Ensure swap (1GB box OOM-kills php/migrate with exit 137 without it)"
+            echo "==> Ensure swap (needed on ~1GB boxes with Elasticsearch)"
             if ! swapon --show | grep -q .; then
               if [ ! -f /swapfile ]; then
                 sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
@@ -48,24 +47,23 @@ jobs:
             fi
             free -h
 
-            echo "==> Pin lean deploy flags in .env (override stale RUN_SCOUT_IMPORT=true)"
+            echo "==> Lean boot flags (migrate / scout:import are manual)"
             touch .env
             for key in RUN_SCOUT_IMPORT SKIP_ENTRYPOINT_MIGRATE; do
               grep -q "^${key}=" .env || echo "${key}=" >> .env
             done
             sed -i 's/^RUN_SCOUT_IMPORT=.*/RUN_SCOUT_IMPORT=false/' .env
             sed -i 's/^SKIP_ENTRYPOINT_MIGRATE=.*/SKIP_ENTRYPOINT_MIGRATE=true/' .env
-            # Keep ES heap small if still set to 512m from older deploys.
             if grep -q '^ES_JAVA_OPTS=' .env; then
               sed -i 's/^ES_JAVA_OPTS=.*/ES_JAVA_OPTS="-Xms256m -Xmx256m"/' .env
             else
               echo 'ES_JAVA_OPTS="-Xms256m -Xmx256m"' >> .env
             fi
 
-            echo "==> Free disk/memory before build"
+            echo "==> Free disk before build"
             docker image prune -f
 
-            echo "==> Build & restart stack (no scout import / no entrypoint migrate)"
+            echo "==> Build & restart stack"
             export RUN_SCOUT_IMPORT=false
             export SKIP_ENTRYPOINT_MIGRATE=true
             docker compose --env-file .env up -d --build --remove-orphans
@@ -83,7 +81,6 @@ jobs:
                 docker compose ps
                 docker compose logs --tail 80 backend || true
                 free -h
-                sudo dmesg | tail -40 | grep -i -E 'oom|killed' || true
                 exit 1
               fi
               sleep 5
@@ -96,42 +93,13 @@ jobs:
               exit 1
             fi
 
-            echo "==> Pause Elasticsearch (~300–500MB) so migrate fits in 1GB RAM"
-            docker compose stop elasticsearch
-            free -h
-
-            echo "==> Migrate"
-            migrate_ok=0
-            for attempt in 1 2 3; do
-              set +e
-              migrate_out="$(docker compose exec -T backend php artisan migrate --force --no-interaction 2>&1)"
-              migrate_rc=$?
-              set -e
-              echo "$migrate_out"
-              if [ "$migrate_rc" = "0" ]; then
-                migrate_ok=1
-                break
-              fi
-              echo "Migrate attempt $attempt failed (exit $migrate_rc)" >&2
-              if [ "$attempt" = "3" ]; then
-                free -h
-                docker compose ps
-                docker compose logs --tail 80 backend || true
-                sudo dmesg | tail -40 | grep -i -E 'oom|killed' || true
-                docker compose start elasticsearch || true
-                exit 1
-              fi
-              sleep 15
-            done
-
-            echo "==> Start Elasticsearch again"
-            docker compose start elasticsearch
-
             echo "==> Prune dangling images"
             docker image prune -f
 
             echo "==> Status"
             docker compose ps
             free -h
-            echo "Scout reindex (optional, when RAM is free):"
+            echo ""
+            echo "Manual next steps (when needed):"
+            echo "  docker compose exec backend php artisan migrate --force"
             echo "  docker compose exec backend php artisan scout:import \"App\\\\Models\\\\Product\""
