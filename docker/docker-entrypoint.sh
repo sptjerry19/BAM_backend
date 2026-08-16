@@ -22,7 +22,15 @@ find storage/logs -type f -name '*.log' -exec chmod 666 {} + 2>/dev/null || true
 
 php artisan config:clear || true
 php artisan storage:link 2>/dev/null || true
-php artisan migrate --force --no-interaction
+
+# CI/deploy runs migrate after php-fpm is up. Skipping here avoids:
+# - two concurrent migrates, and
+# - a long entrypoint block that makes "wait for php-fpm" hit SSH timeouts.
+if [ "${SKIP_ENTRYPOINT_MIGRATE:-false}" = "true" ]; then
+  echo "[entrypoint] SKIP_ENTRYPOINT_MIGRATE=true — migrate deferred"
+else
+  php artisan migrate --force --no-interaction
+fi
 
 if [ "${RUN_SCOUT_IMPORT:-false}" = "true" ]; then
   echo "[entrypoint] waiting for Elasticsearch..."

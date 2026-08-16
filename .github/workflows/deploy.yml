@@ -12,7 +12,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -20,6 +20,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          # Build + ES/MySQL health + migrate on a 1GB box can exceed the 10m default.
+          command_timeout: 30m
           script_stop: true
           script: |
             set -euo pipefail
@@ -49,17 +51,36 @@ jobs:
             echo "==> Free disk/memory before build"
             docker image prune -f
 
-            echo "==> Build & restart stack"
+            echo "==> Build & restart stack (migrate deferred until php-fpm is up)"
+            export SKIP_ENTRYPOINT_MIGRATE=true
             docker compose --env-file .env up -d --build --remove-orphans
 
-            echo "==> Wait for php-fpm (entrypoint migrates first; don't run two migrations at once)"
-            for i in $(seq 1 40); do
-              if docker compose exec -T backend pgrep -x php-fpm >/dev/null 2>&1; then
-                echo "php-fpm ready after ${i}0s"
+            echo "==> Wait for php-fpm"
+            ready=0
+            for i in $(seq 1 24); do
+              if docker compose exec -T backend sh -c "pgrep -f php-fpm >/dev/null"; then
+                echo "php-fpm ready after ~$((i * 5))s"
+                ready=1
                 break
               fi
-              sleep 10
+              # Surface crash-loops early instead of waiting for SSH timeout.
+              if ! docker compose ps backend --status running -q 2>/dev/null | grep -q .; then
+                echo "backend container is not running" >&2
+                docker compose ps
+                docker compose logs --tail 80 backend || true
+                free -h
+                sudo dmesg | tail -40 | grep -i -E 'oom|killed' || true
+                exit 1
+              fi
+              sleep 5
             done
+            if [ "$ready" != "1" ]; then
+              echo "php-fpm not ready after 120s" >&2
+              docker compose ps
+              docker compose logs --tail 80 backend || true
+              free -h
+              exit 1
+            fi
 
             echo "==> Migrate"
             for attempt in 1 2 3; do
@@ -70,6 +91,7 @@ jobs:
                 echo "Migration failed 3x — memory snapshot below" >&2
                 free -h
                 docker compose ps
+                docker compose logs --tail 80 backend || true
                 sudo dmesg | tail -40 | grep -i -E 'oom|killed' || true
                 exit 1
               fi
