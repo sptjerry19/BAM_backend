@@ -34,11 +34,48 @@ jobs:
             git checkout "$DEFAULT_BRANCH"
             git reset --hard "origin/$DEFAULT_BRANCH"
 
+            echo "==> Ensure swap (1GB box OOM-kills php/migrate with exit 137 without it)"
+            if ! swapon --show | grep -q .; then
+              if [ ! -f /swapfile ]; then
+                sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+                sudo chmod 600 /swapfile
+                sudo mkswap /swapfile
+              fi
+              sudo swapon /swapfile || true
+              grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            fi
+            free -h
+
+            echo "==> Free disk/memory before build"
+            docker image prune -f
+
             echo "==> Build & restart stack"
             docker compose --env-file .env up -d --build --remove-orphans
 
+            echo "==> Wait for php-fpm (entrypoint migrates first; don't run two migrations at once)"
+            for i in $(seq 1 40); do
+              if docker compose exec -T backend pgrep -x php-fpm >/dev/null 2>&1; then
+                echo "php-fpm ready after ${i}0s"
+                break
+              fi
+              sleep 10
+            done
+
             echo "==> Migrate"
-            docker compose exec -T backend php artisan migrate --force --no-interaction
+            for attempt in 1 2 3; do
+              if docker compose exec -T backend php artisan migrate --force --no-interaction; then
+                break
+              fi
+              if [ "$attempt" = "3" ]; then
+                echo "Migration failed 3x — memory snapshot below" >&2
+                free -h
+                docker compose ps
+                sudo dmesg | tail -40 | grep -i -E 'oom|killed' || true
+                exit 1
+              fi
+              echo "Migrate attempt $attempt failed, retrying in 15s..."
+              sleep 15
+            done
 
             echo "==> Prune dangling images"
             docker image prune -f

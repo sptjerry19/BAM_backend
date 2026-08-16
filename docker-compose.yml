@@ -55,11 +55,16 @@ services:
 
   mysql:
     image: mysql:8.4
+    # performance_schema alone costs ~300MB — too much next to Elasticsearch on t3.micro.
+    command:
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=128M
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-jbam}
       MYSQL_USER: jbam
       MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootsecret}
+    mem_limit: ${MYSQL_MEM_LIMIT:-512m}
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -83,8 +88,9 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       xpack.security.http.ssl.enabled: "false"
-      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms512m -Xmx512m}
+      ES_JAVA_OPTS: ${ES_JAVA_OPTS:--Xms256m -Xmx256m}
       cluster.routing.allocation.disk.threshold_enabled: "false"
+    mem_limit: ${ES_MEM_LIMIT:-768m}
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
