@@ -314,9 +314,38 @@ class ProductService
                 ...$uploaded,
             ])));
 
-            $removed = array_diff($product->images ?? [], $imageUrls);
-            if ($removed) {
-                $this->uploads->deleteMany(array_values($removed));
+            // Pure string/path compare — never call S3 while resolving keep_images.
+            $keptKeys = [];
+            foreach ($imageUrls as $url) {
+                $key = $this->storageObjectKey($url);
+                if ($key !== '') {
+                    $keptKeys[$key] = true;
+                }
+            }
+
+            $removed = [];
+            foreach ($product->images ?? [] as $old) {
+                if (! is_string($old) || trim($old) === '') {
+                    continue;
+                }
+                $oldKey = $this->storageObjectKey($old);
+                if ($oldKey === '' || isset($keptKeys[$oldKey])) {
+                    continue;
+                }
+                $removed[] = $old;
+            }
+
+            // Cleanup must never block product update (orphan objects are OK).
+            if ($removed !== []) {
+                try {
+                    $this->uploads->deleteMany($removed);
+                } catch (Throwable $e) {
+                    Log::warning('Failed to delete removed product images from storage', [
+                        'product_id' => $product->id,
+                        'removed' => $removed,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
             $data['images'] = $imageUrls;
@@ -402,5 +431,37 @@ class ProductService
         }
 
         return $urls;
+    }
+
+    /**
+     * Derive an S3/object key from a URL or relative path without touching Storage/S3.
+     */
+    private function storageObjectKey(string $pathOrUrl): string
+    {
+        $pathOrUrl = trim($pathOrUrl);
+        if ($pathOrUrl === '') {
+            return '';
+        }
+
+        if (! str_starts_with($pathOrUrl, 'http://') && ! str_starts_with($pathOrUrl, 'https://')) {
+            $path = ltrim($pathOrUrl, '/');
+        } else {
+            $path = ltrim((string) parse_url($pathOrUrl, PHP_URL_PATH), '/');
+        }
+
+        if ($path === '') {
+            return '';
+        }
+
+        $bucket = trim((string) config('filesystems.disks.s3.bucket'), '/');
+        if ($bucket !== '' && str_starts_with($path, $bucket.'/')) {
+            $path = substr($path, strlen($bucket) + 1);
+        }
+
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+
+        return $path;
     }
 }

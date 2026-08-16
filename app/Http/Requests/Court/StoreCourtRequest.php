@@ -29,6 +29,8 @@ class StoreCourtRequest extends FormRequest
             'image' => 'nullable|string|max:255',
             'x' => 'nullable|numeric',
             'y' => 'nullable|numeric',
+            'lat' => 'nullable|numeric|min:-90|max:90',
+            'lng' => 'nullable|numeric|min:-180|max:180',
             'phone' => 'nullable|string|max:50',
             'hours' => 'nullable|string|max:100',
         ];

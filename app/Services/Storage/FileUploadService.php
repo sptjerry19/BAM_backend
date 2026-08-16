@@ -213,18 +213,24 @@ class FileUploadService
 
     public function delete(?string $pathOrUrl, ?string $disk = null): bool
     {
-        if (! $pathOrUrl) {
+        $pathOrUrl = is_string($pathOrUrl) ? trim($pathOrUrl) : '';
+        if ($pathOrUrl === '') {
             return false;
         }
 
-        $diskName = $this->disk($disk);
-        $path = $this->toPath($pathOrUrl, $diskName);
+        try {
+            $diskName = $this->disk($disk);
+            $path = $this->toPath($pathOrUrl, $diskName);
 
-        if ($path === '' || ! Storage::disk($diskName)->exists($path)) {
+            if ($path === '') {
+                return false;
+            }
+
+            // Skip exists() — S3 HeadObject/GetObject with a bad key throws under throw=true.
+            return (bool) Storage::disk($diskName)->delete($path);
+        } catch (\Throwable) {
             return false;
         }
-
-        return Storage::disk($diskName)->delete($path);
     }
 
     /**
@@ -233,6 +239,9 @@ class FileUploadService
     public function deleteMany(array $pathsOrUrls, ?string $disk = null): void
     {
         foreach ($pathsOrUrls as $item) {
+            if (! is_string($item) || trim($item) === '') {
+                continue;
+            }
             $this->delete($item, $disk);
         }
     }
@@ -240,6 +249,11 @@ class FileUploadService
     public function url(string $path, ?string $disk = null): string
     {
         $diskName = $this->disk($disk);
+        $path = ltrim($path, '/');
+
+        if ($path === '') {
+            return '';
+        }
 
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
@@ -248,22 +262,42 @@ class FileUploadService
         return Storage::disk($diskName)->url($path);
     }
 
+    /**
+     * Convert a public URL or storage key into an object key (never call S3 with an empty Key).
+     */
     public function toPath(string $pathOrUrl, ?string $disk = null): string
     {
+        $pathOrUrl = trim($pathOrUrl);
+        if ($pathOrUrl === '') {
+            return '';
+        }
+
         if (! str_starts_with($pathOrUrl, 'http://') && ! str_starts_with($pathOrUrl, 'https://')) {
             return ltrim($pathOrUrl, '/');
         }
 
-        $diskName = $this->disk($disk);
-        $base = rtrim((string) Storage::disk($diskName)->url(''), '/').'/';
-
-        if (str_starts_with($pathOrUrl, $base)) {
-            return ltrim(substr($pathOrUrl, strlen($base)), '/');
+        $path = parse_url($pathOrUrl, PHP_URL_PATH);
+        $path = ltrim((string) $path, '/');
+        if ($path === '') {
+            return '';
         }
 
-        $path = parse_url($pathOrUrl, PHP_URL_PATH);
+        $diskName = $this->disk($disk);
 
-        return ltrim((string) $path, '/');
+        // Path-style S3 URLs: /{bucket}/{key}
+        if ($diskName === 's3') {
+            $bucket = trim((string) config('filesystems.disks.s3.bucket'), '/');
+            if ($bucket !== '' && str_starts_with($path, $bucket.'/')) {
+                $path = substr($path, strlen($bucket) + 1);
+            }
+        }
+
+        // Local public disk URLs often include /storage/...
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+
+        return $path;
     }
 
     private function assertValidImage(UploadedFile $file): void

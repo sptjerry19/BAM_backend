@@ -24,6 +24,19 @@ cd backend
 docker compose --env-file .env up -d --build
 ```
 
+### Dev: sửa code không cần build lại (Windows)
+
+File `docker-compose.override.yml` (gitignored, local) mount **chọn lọc** `app/`, `routes/`, … và giữ `vendor` trên volume Linux. Không mount cả `./` — trên Docker Desktop Windows sẽ làm API chậm vài giây mỗi request.
+
+```bash
+cd backend
+# Lần đầu / sau khi đổi composer.lock:
+docker compose run --rm --no-deps --entrypoint composer backend install --no-interaction
+docker compose up -d --force-recreate backend api
+```
+
+EC2/production: **không** dùng override — deploy vẫn `up -d --build` như cũ.
+
 Rồi chạy FE (repo riêng) trên port 80 — xem `frontend/DOCKER.md`.
 
 ## Deploy EC2

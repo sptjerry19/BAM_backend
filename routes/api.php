@@ -40,6 +40,9 @@ Route::group([
         Route::get('/{court}', [CourtController::class, 'show']);
     });
 
+    // Guest checkout allowed — member_id optional when logged in
+    Route::post('/orders', [OrderController::class, 'store']);
+
     // Authenticated member actions
     Route::group(['middleware' => 'auth:api'], function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -56,7 +59,6 @@ Route::group([
         Route::delete('/custom-equipments/{id}', [MemberEquipmentController::class, 'destroy']);
 
         Route::post('/bookings', [BookingController::class, 'store']);
-        Route::post('/orders', [OrderController::class, 'store']);
 
         // Admin only — write / manage
         Route::middleware('admin')->group(function () {
