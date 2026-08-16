@@ -40,6 +40,7 @@ services:
       SCOUT_PREFIX: jb_
       SCOUT_QUEUE: "false"
       RUN_SCOUT_IMPORT: "${RUN_SCOUT_IMPORT:-false}"
+      SKIP_ENTRYPOINT_MIGRATE: "${SKIP_ENTRYPOINT_MIGRATE:-false}"
     volumes:
       - backend_storage:/var/www/html/storage
     depends_on:
