@@ -12,7 +12,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Matchish\ScoutElasticSearch\Engines\ElasticSearchEngine;
 use Throwable;
 
@@ -249,7 +248,9 @@ class ProductService
         return Product::query()
             ->select(self::LIST_COLUMNS)
             ->orderByDesc('sold_count')
+            ->orderByDesc('rating')
             ->orderByDesc('featured')
+            ->orderByDesc('id')
             ->limit($limit)
             ->get();
     }
@@ -262,8 +263,8 @@ class ProductService
             'products'
         );
 
-        $product = Product::create([
-            'id' => $data['id'] ?? ('p_'.Str::lower(Str::random(10))),
+        $productId = $data['id'] ?? null;
+        $attributes = [
             'name' => $data['name'],
             'brand' => $data['brand'],
             'category' => $data['category'],
@@ -276,7 +277,13 @@ class ProductService
             'reviews' => $data['reviews'] ?? 0,
             'description' => $data['description'] ?? null,
             'featured' => filter_var($data['featured'] ?? false, FILTER_VALIDATE_BOOLEAN),
-        ]);
+        ];
+
+        if (is_numeric($productId)) {
+            $attributes['id'] = (int) $productId;
+        }
+
+        $product = Product::create($attributes);
 
         $this->forgetListCountCache($product->category);
 

@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Court;
 use App\Models\Member;
 use App\Models\Product;
 use Illuminate\Database\Seeder;
@@ -11,120 +10,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $courts = [
-            [
-                'id' => 1,
-                'name' => 'Sân Cầu Lông Hoàng Mai',
-                'address' => '45 Hoàng Mai, Hà Nội',
-                'district' => 'Hoàng Mai',
-                'price' => 60000,
-                'surfaces' => 'Gỗ',
-                'courts' => 6,
-                'status' => 'open',
-                'rating' => 4.7,
-                'image' => 'https://jbam-storage-951885766321-ap-southeast-2-an.s3.ap-southeast-2.amazonaws.com/products/background1.jpg',
-                'x' => 52,
-                'y' => 58,
-                'lat' => 20.9754,
-                'lng' => 105.8500,
-                'phone' => '024 3876 5432',
-                'hours' => '6:00 - 22:00',
-            ],
-            [
-                'id' => 2,
-                'name' => 'CLB Cầu Lông Đống Đa',
-                'address' => '12 Xã Đàn, Đống Đa, Hà Nội',
-                'district' => 'Đống Đa',
-                'price' => 50000,
-                'surfaces' => 'PVC',
-                'courts' => 4,
-                'status' => 'busy',
-                'rating' => 4.5,
-                'image' => 'https://jbam-storage-951885766321-ap-southeast-2-an.s3.ap-southeast-2.amazonaws.com/products/background2.jpg',
-                'x' => 38,
-                'y' => 42,
-                'lat' => 21.0159,
-                'lng' => 105.8347,
-                'phone' => '024 3512 8765',
-                'hours' => '5:30 - 23:00',
-            ],
-            [
-                'id' => 3,
-                'name' => 'Sân Cầu Lông Cầu Giấy',
-                'address' => '78 Trần Thái Tông, Cầu Giấy, Hà Nội',
-                'district' => 'Cầu Giấy',
-                'price' => 70000,
-                'surfaces' => 'Gỗ',
-                'courts' => 8,
-                'status' => 'open',
-                'rating' => 4.8,
-                'image' => 'https://jbam-storage-951885766321-ap-southeast-2-an.s3.ap-southeast-2.amazonaws.com/products/background3.jpg',
-                'x' => 28,
-                'y' => 35,
-                'lat' => 21.0313,
-                'lng' => 105.7877,
-                'phone' => '024 7301 2345',
-                'hours' => '6:00 - 22:30',
-            ],
-            [
-                'id' => 4,
-                'name' => 'Thể Thao Thanh Xuân',
-                'address' => '156 Nguyễn Tuân, Thanh Xuân, Hà Nội',
-                'district' => 'Thanh Xuân',
-                'price' => 55000,
-                'surfaces' => 'Rubber',
-                'courts' => 5,
-                'status' => 'open',
-                'rating' => 4.3,
-                'image' => 'https://jbam-storage-951885766321-ap-southeast-2-an.s3.ap-southeast-2.amazonaws.com/products/background4.jpg',
-                'x' => 42,
-                'y' => 65,
-                'lat' => 21.0004,
-                'lng' => 105.8047,
-                'phone' => '024 6598 3210',
-                'hours' => '6:00 - 22:00',
-            ],
-            [
-                'id' => 5,
-                'name' => 'Sân Cầu Lông Long Biên',
-                'address' => '23 Ngọc Lâm, Long Biên, Hà Nội',
-                'district' => 'Long Biên',
-                'price' => 45000,
-                'surfaces' => 'PVC',
-                'courts' => 3,
-                'status' => 'closed',
-                'rating' => 4.1,
-                'image' => 'https://jbam-storage-951885766321-ap-southeast-2-an.s3.ap-southeast-2.amazonaws.com/products/background5.jpg',
-                'x' => 68,
-                'y' => 30,
-                'lat' => 21.0450,
-                'lng' => 105.8720,
-                'phone' => '024 3826 7654',
-                'hours' => '7:00 - 21:00',
-            ],
-            [
-                'id' => 6,
-                'name' => 'Olympic Badminton Center',
-                'address' => '99 Láng Hạ, Ba Đình, Hà Nội',
-                'district' => 'Ba Đình',
-                'price' => 90000,
-                'surfaces' => 'Gỗ cao cấp',
-                'courts' => 12,
-                'status' => 'open',
-                'rating' => 4.9,
-                'image' => 'https://jbam-storage-951885766321-ap-southeast-2-an.s3.ap-southeast-2.amazonaws.com/products/background6.jpg',
-                'x' => 33,
-                'y' => 25,
-                'lat' => 21.0161,
-                'lng' => 105.8123,
-                'phone' => '024 3771 9876',
-                'hours' => '5:00 - 23:30',
-            ],
-        ];
-
-        foreach ($courts as $court) {
-            Court::create($court);
-        }
+        $this->call(CourtSeeder::class);
 
         $products = [
             [
@@ -386,6 +272,9 @@ class DatabaseSeeder extends Seeder
             'member_id' => 1,
         ]);
 
-        $this->call(ProductReviewSeeder::class);
+        $this->call([
+            ProductReviewSeeder::class,
+            NewsSeeder::class,
+        ]);
     }
 }

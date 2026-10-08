@@ -16,6 +16,7 @@ return [
 
     'login_success' => 'Đăng nhập thành công.',
     'login_failed' => 'Email hoặc mật khẩu không đúng.',
+    'account_hidden' => 'Tài khoản này đã bị ẩn.',
     'register_success' => 'Tạo tài khoản thành công.',
     'logout_success' => 'Đăng xuất thành công.',
     'unauthorized' => 'Chưa xác thực.',

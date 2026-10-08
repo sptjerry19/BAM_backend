@@ -16,6 +16,7 @@ return [
 
     'login_success' => 'Logged in successfully.',
     'login_failed' => 'Invalid email or password.',
+    'account_hidden' => 'This account has been hidden.',
     'register_success' => 'Account created successfully.',
     'logout_success' => 'Logged out successfully.',
     'unauthorized' => 'Unauthorized.',

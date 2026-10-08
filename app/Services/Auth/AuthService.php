@@ -4,12 +4,18 @@ namespace App\Services\Auth;
 
 use App\Models\Member;
 use App\Models\User;
+use App\Services\Storage\FileUploadService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
+    public function __construct(private readonly FileUploadService $uploads)
+    {
+    }
     /**
      * @return array{access_token: string, token_type: string, expires_in: int, user: array}|null
      */
@@ -21,6 +27,15 @@ class AuthService
 
         /** @var User $user */
         $user = auth()->user();
+        $user->loadMissing('member');
+
+        if ($user->member && $user->member->status !== 'active') {
+            auth()->logout();
+
+            throw ValidationException::withMessages([
+                'email' => [__('auth.account_hidden')],
+            ]);
+        }
 
         return $this->tokenPayload($token, $user);
     }
@@ -30,10 +45,7 @@ class AuthService
      */
     public function register(array $data): array
     {
-        $memberId = 'm_' . Str::lower(Str::random(10));
-
         $member = Member::create([
-            'id' => $memberId,
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
@@ -67,6 +79,42 @@ class AuthService
         $user = auth()->user();
 
         return $user->toAuthArray();
+    }
+
+    public function updateProfile(array $data, ?UploadedFile $avatarFile = null): array
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        if (! empty($data['password'])) {
+            if (! Hash::check((string) ($data['current_password'] ?? ''), $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => [__('messages.current_password_invalid')],
+                ]);
+            }
+            $user->password = $data['password'];
+        }
+
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+        $user->save();
+
+        $member = $user->member;
+        if ($member) {
+            $avatar = $data['avatar'] ?? $member->avatar;
+            if ($avatarFile) {
+                $avatar = $this->uploads->upload($avatarFile, 'avatars')['url'];
+            }
+
+            $member->update([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+                'avatar' => $avatar,
+            ]);
+        }
+
+        return $user->fresh()->toAuthArray();
     }
 
     public function logout(): void

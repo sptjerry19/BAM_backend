@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Product\BestsellersRequest;
 use App\Http\Requests\Product\IndexProductRequest;
 use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
@@ -22,9 +23,11 @@ class ProductController extends Controller
         return $this->success($products);
     }
 
-    public function bestsellers(): JsonResponse
+    public function bestsellers(BestsellersRequest $request): JsonResponse
     {
-        return $this->success($this->products->bestsellers(5));
+        $limit = (int) ($request->validated()['limit'] ?? 5);
+
+        return $this->success($this->products->bestsellers($limit));
     }
 
     public function store(StoreProductRequest $request): JsonResponse

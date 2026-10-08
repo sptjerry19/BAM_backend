@@ -3,9 +3,13 @@
 namespace App\Services\Member;
 
 use App\Models\Member;
+use App\Models\MemberEquipment;
 use App\Models\Product;
+use App\Models\ProductReview;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class MemberService
 {
@@ -39,6 +43,23 @@ class MemberService
     public function findOrFail(string $id): Member
     {
         return Member::findOrFail($id);
+    }
+
+    public function updateStatus(Member $member, string $status): Member
+    {
+        $member->update(['status' => $status]);
+
+        return $member->fresh();
+    }
+
+    public function delete(Member $member): void
+    {
+        DB::transaction(function () use ($member) {
+            MemberEquipment::query()->where('member_id', $member->id)->delete();
+            ProductReview::query()->where('member_id', $member->id)->update(['member_id' => null]);
+            User::query()->where('member_id', $member->id)->where('role', '!=', 'admin')->delete();
+            $member->delete();
+        });
     }
 
     public function attachEquipment(string $memberId, string $productId): Member

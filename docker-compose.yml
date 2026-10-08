@@ -66,6 +66,9 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootsecret}
     mem_limit: ${MYSQL_MEM_LIMIT:-512m}
+    ports:
+      # Local GUI (DBeaver): 127.0.0.1 only — not exposed on EC2 public NIC.
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

@@ -6,6 +6,7 @@ use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Requests\Auth\UpdateProfileRequest;
 use App\Services\Auth\AuthService;
 use Illuminate\Http\JsonResponse;
 
@@ -38,6 +39,16 @@ class AuthController extends Controller
     public function me(): JsonResponse
     {
         return $this->success($this->auth->me());
+    }
+
+    public function update(UpdateProfileRequest $request): JsonResponse
+    {
+        $profile = $this->auth->updateProfile(
+            $request->validated(),
+            $request->file('avatar_file')
+        );
+
+        return $this->success($profile, __('messages.updated'));
     }
 
     public function logout(): JsonResponse

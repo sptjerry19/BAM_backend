@@ -4,12 +4,15 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CourtController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\MemberEquipmentController;
+use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\RankingController;
 use App\Http\Controllers\Api\ProductReviewController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CategoryController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -37,17 +40,32 @@ Route::group([
 
     Route::group(['prefix' => 'courts'], function () {
         Route::get('/', [CourtController::class, 'index']);
+        Route::get('/top', [CourtController::class, 'top']);
+        Route::get('/picked', [CourtController::class, 'picked']);
+        Route::get('/{court}/availability', [CourtController::class, 'availability']);
         Route::get('/{court}', [CourtController::class, 'show']);
     });
 
     // Guest checkout allowed — member_id optional when logged in
     Route::post('/orders', [OrderController::class, 'store']);
 
+    Route::get('/rankings', [RankingController::class, 'index']);
+    Route::get('/athletes/{athlete}', [RankingController::class, 'show']);
+
+    //News
+    Route::get('/news', [NewsController::class, 'index']);
+    Route::get('/news/{news}', [NewsController::class, 'show']);
+
+    //Categories
+    Route::get('/categories', [CategoryController::class, 'index']);
+    Route::get('/categories/{category}', [CategoryController::class, 'show']);
+
     // Authenticated member actions
     Route::group(['middleware' => 'auth:api'], function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
         Route::get('/me', [AuthController::class, 'me']);
+        Route::match(['put', 'post'], '/me', [AuthController::class, 'update']);
 
         Route::post('/products/{product}/reviews', [ProductReviewController::class, 'store']);
 
@@ -65,11 +83,25 @@ Route::group([
             Route::get('/stats', [StatsController::class, 'index']);
             Route::post('/uploads', [UploadController::class, 'store']);
             Route::get('/members', [MemberController::class, 'index']);
+            Route::patch('/members/{member}/status', [MemberController::class, 'updateStatus']);
+            Route::delete('/members/{member}', [MemberController::class, 'destroy']);
 
             Route::group(['prefix' => 'courts'], function () {
                 Route::post('/', [CourtController::class, 'store']);
                 Route::put('/{court}', [CourtController::class, 'update']);
                 Route::delete('/{court}', [CourtController::class, 'destroy']);
+            });
+
+            Route::group(['prefix' => 'news'], function () {
+                Route::post('/', [NewsController::class, 'store']);
+                Route::put('/{news}', [NewsController::class, 'update']);
+                Route::delete('/{news}', [NewsController::class, 'destroy']);
+            });
+
+            Route::group(['prefix' => 'categories'], function () {
+                Route::post('/', [CategoryController::class, 'store']);
+                Route::put('/{category}', [CategoryController::class, 'update']);
+                Route::delete('/{category}', [CategoryController::class, 'destroy']);
             });
 
             Route::group(['prefix' => 'products'], function () {
