@@ -4,31 +4,24 @@ namespace App\Services\News;
 
 use App\Models\News;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class NewsService
 {
-    public function list(array $filters)
+    public function list(array $filters): LengthAwarePaginator
     {
-        try {
-            $perPage = max(1, min((int) ($filters['per_page'] ?? 10), 100));
-            $query = News::query()
-                ->with(['category:id,name,image', 'user:id,name,role'])
-                ->orderByDesc('featured')
-                ->orderByDesc('date')
-                ->orderByDesc('id');
+        $perPage = max(1, min((int) ($filters['per_page'] ?? 10), 100));
+        $query = News::query()
+            ->with(['category:id,name,image', 'user:id,name,role'])
+            ->orderByDesc('featured')
+            ->orderByDesc('date')
+            ->orderByDesc('id');
 
-            if (! empty($filters['category_id'])) {
-                $query->where('category_id', $filters['category_id']);
-            }
-
-            return $query->paginate($perPage);
-        } catch (\Exception $e) {
-            Log::error('News list failed: ' . $e->getMessage());
-            return false;
+        if (! empty($filters['category_id'])) {
+            $query->where('category_id', $filters['category_id']);
         }
+
+        return $query->paginate($perPage);
     }
 
     public function findOrFail(string $id): News
@@ -38,48 +31,40 @@ class NewsService
             ->findOrFail($id);
     }
 
-    public function create(array $data)
+    public function create(array $data): News
     {
-        try {
-            $data['user_id'] = auth()->id();
-            $data['slug'] = $this->uniqueSlug($data['slug'] ?? $data['title']);
-            $data['date'] = $data['date'] ?? now()->toDateString();
-            $data['featured'] = (bool) ($data['featured'] ?? false);
-            $data['content'] = $data['content'] ?? '';
-            $data['body'] = $data['body'] ?? $data['content'];
-            $data['image'] = $data['image'] ?? '';
+        $data['user_id'] = auth()->id();
+        $data['slug'] = $this->uniqueSlug($data['slug'] ?? $data['title']);
+        $data['date'] = $data['date'] ?? now()->toDateString();
+        $data['featured'] = (bool) ($data['featured'] ?? false);
+        $data['content'] = $data['content'] ?? '';
+        $data['body'] = $data['body'] ?? $data['content'];
+        $data['image'] = $data['image'] ?? '';
 
-            $news = News::create($data);
-            return $this->findOrFail((string) $news->id);
-        } catch (\Exception $e) {
-            Log::error('News create failed: ' . $e->getMessage());
-            return false;
-        }
+        $news = News::create($data);
+
+        return $this->findOrFail((string) $news->id);
     }
 
-    public function update(News $news, array $data)
+    public function update(News $news, array $data): News
     {
-        try {
-            if (isset($data['title']) && empty($data['slug'])) {
-                $data['slug'] = $this->uniqueSlug($data['title'], $news->id);
-            } elseif (! empty($data['slug'])) {
-                $data['slug'] = $this->uniqueSlug($data['slug'], $news->id);
-            }
-
-            if (array_key_exists('content', $data) && empty($data['body'])) {
-                $data['body'] = $data['content'];
-            }
-
-            if (array_key_exists('featured', $data)) {
-                $data['featured'] = (bool) $data['featured'];
-            }
-
-            $news->update($data);
-            return $this->findOrFail((string) $news->id);
-        } catch (\Exception $e) {
-            Log::error('News update failed: ' . $e->getMessage());
-            return false;
+        if (isset($data['title']) && empty($data['slug'])) {
+            $data['slug'] = $this->uniqueSlug($data['title'], $news->id);
+        } elseif (! empty($data['slug'])) {
+            $data['slug'] = $this->uniqueSlug($data['slug'], $news->id);
         }
+
+        if (array_key_exists('content', $data) && empty($data['body'])) {
+            $data['body'] = $data['content'];
+        }
+
+        if (array_key_exists('featured', $data)) {
+            $data['featured'] = (bool) $data['featured'];
+        }
+
+        $news->update($data);
+
+        return $this->findOrFail((string) $news->id);
     }
 
     public function delete(News $news): void
