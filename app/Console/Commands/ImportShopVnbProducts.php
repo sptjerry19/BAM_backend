@@ -56,7 +56,7 @@ class ImportShopVnbProducts extends Command
             $price = (int) ($item['price'] ?? 0);
             $externalId = trim((string) ($item['id'] ?? ''));
 
-            if ($name === '' || $brand === '' || $price < 0) {
+            if ($name === '' || $price < 0) {
                 $skipped++;
 
                 continue;
@@ -88,10 +88,16 @@ class ImportShopVnbProducts extends Command
                 $description = trim($description."\n\nNguồn: ".$sourceUrl);
             }
 
+            $allowed = ['racket', 'shoes', 'shirt', 'shorts', 'shuttlecock', 'bag', 'grip', 'string', 'other'];
+            $category = (string) ($item['category'] ?? 'other');
+            if (! in_array($category, $allowed, true)) {
+                $category = 'other';
+            }
+
             $row = [
                 'name' => mb_substr($name, 0, 255),
-                'brand' => mb_substr($brand, 0, 255),
-                'category' => 'racket',
+                'brand' => mb_substr($brand === '' ? 'Other' : $brand, 0, 255),
+                'category' => $category,
                 'price' => $price,
                 'original_price' => $original,
                 'image' => $image,
@@ -149,7 +155,13 @@ class ImportShopVnbProducts extends Command
         }
 
         $this->info("Done. imported={$inserted} skipped={$skipped}");
-        $this->info('Racket count now: '.DB::table('products')->where('category', 'racket')->count());
+        $counts = DB::table('products')
+            ->selectRaw('category, COUNT(*) as total')
+            ->groupBy('category')
+            ->pluck('total', 'category');
+        foreach ($counts as $category => $total) {
+            $this->line("  {$category}: {$total}");
+        }
 
         return self::SUCCESS;
     }

@@ -18,7 +18,7 @@ class IndexProductRequest extends FormRequest
     {
         return [
             'search' => 'nullable|string|max:255',
-            'category' => 'nullable|string|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string',
+            'category' => 'nullable|string|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string,other',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:100',
         ];
