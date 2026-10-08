@@ -20,7 +20,7 @@ class StoreProductRequest extends FormRequest
             'id' => 'nullable',
             'name' => 'required|string|max:255',
             'brand' => 'required|string|max:255',
-            'category' => 'required|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string',
+            'category' => 'required|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string,other',
             'price' => 'required|integer|min:0',
             'original_price' => 'nullable|integer|min:0',
             'image' => 'nullable|string|max:2048',

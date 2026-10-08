@@ -19,7 +19,7 @@ class UpdateProductRequest extends FormRequest
         return [
             'name' => 'sometimes|string|max:255',
             'brand' => 'sometimes|string|max:255',
-            'category' => 'sometimes|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string',
+            'category' => 'sometimes|in:racket,shoes,shirt,shorts,shuttlecock,bag,grip,string,other',
             'price' => 'sometimes|integer|min:0',
             'original_price' => 'nullable|integer|min:0',
             'image' => 'nullable|string|max:2048',
