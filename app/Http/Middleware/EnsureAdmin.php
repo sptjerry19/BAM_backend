@@ -13,7 +13,7 @@ class EnsureAdmin
     {
         $user = auth('api')->user();
 
-        if (! $user || ! $user->role === 'admin') {
+        if (! $user || $user->role !== 'admin') {
             return ApiResponse::error(__('auth.forbidden'), 403);
         }
 

@@ -10,10 +10,6 @@ class Product extends Model
 {
     use Searchable;
 
-    public $incrementing = false;
-
-    protected $keyType = 'string';
-
     protected $fillable = [
         'id',
         'name',

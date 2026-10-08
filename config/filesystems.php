@@ -52,7 +52,11 @@ return [
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
-            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            // env() returns strings — cast so "false" is not treated as true (LocalStack needs true).
+            'use_path_style_endpoint' => filter_var(
+                env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+                FILTER_VALIDATE_BOOLEAN
+            ),
             'throw' => true,
             // Do not set ACL visibility — many buckets disable ACLs (Object Ownership).
             // Make objects public via bucket policy instead.

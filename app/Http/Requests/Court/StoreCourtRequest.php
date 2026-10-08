@@ -17,7 +17,7 @@ class StoreCourtRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id' => 'required|string|unique:courts,id',
+            'id' => 'nullable',
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
             'district' => 'required|string|max:255',

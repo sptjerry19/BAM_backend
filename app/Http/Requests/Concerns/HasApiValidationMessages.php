@@ -70,6 +70,7 @@ trait HasApiValidationMessages
             'confirmed' => __('messages.validation.confirmed'),
             'date' => __('messages.validation.date'),
             'date_format' => __('messages.validation.date_format'),
+            'after_or_equal' => __('messages.validation.after_or_equal'),
             'min.numeric' => __('messages.validation.min.numeric'),
             'min.integer' => __('messages.validation.min.integer'),
             'min.string' => __('messages.validation.min.string'),
