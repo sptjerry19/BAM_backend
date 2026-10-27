@@ -74,6 +74,10 @@ class Handler extends ExceptionHandler
             return ApiResponse::error(__('messages.not_found'), 404);
         }
 
+        if ($e instanceof CapitalRivalsException) {
+            return ApiResponse::error($e->getMessage(), $e->httpStatus, ['code' => $e->errorCode]);
+        }
+
         if ($e instanceof QueryException || $e instanceof PDOException) {
             report($e);
 

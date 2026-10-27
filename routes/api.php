@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\RankingController;
 use App\Http\Controllers\Api\ProductReviewController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\CapitalRivals\RoomController as CapitalRivalsRoomController;
 use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
@@ -52,7 +53,25 @@ Route::group([
     Route::get('/rankings', [RankingController::class, 'index']);
     Route::get('/athletes/{athlete}', [RankingController::class, 'show']);
 
-    //News
+    Route::prefix('games/cr')->group(function () {
+        Route::post('/rooms', [CapitalRivalsRoomController::class, 'store']);
+        Route::post('/rooms/{code}/join', [CapitalRivalsRoomController::class, 'join']);
+        Route::post('/rooms/{code}/ready', [CapitalRivalsRoomController::class, 'ready']);
+        Route::post('/rooms/{code}/start', [CapitalRivalsRoomController::class, 'start']);
+        Route::post('/rooms/{code}/leave', [CapitalRivalsRoomController::class, 'leave']);
+        Route::post('/rooms/{code}/roll', [CapitalRivalsRoomController::class, 'roll']);
+        Route::post('/rooms/{code}/buy', [CapitalRivalsRoomController::class, 'buy']);
+        Route::post('/rooms/{code}/skip', [CapitalRivalsRoomController::class, 'skip']);
+        Route::post('/rooms/{code}/pay', [CapitalRivalsRoomController::class, 'pay']);
+        Route::post('/rooms/{code}/card', [CapitalRivalsRoomController::class, 'card']);
+        Route::post('/rooms/{code}/upgrade', [CapitalRivalsRoomController::class, 'upgrade']);
+        Route::post('/rooms/{code}/end-turn', [CapitalRivalsRoomController::class, 'endTurn']);
+        Route::post('/rooms/{code}/bankrupt', [CapitalRivalsRoomController::class, 'bankrupt']);
+        Route::post('/rooms/{code}/tick', [CapitalRivalsRoomController::class, 'tick']);
+        Route::get('/rooms/{code}', [CapitalRivalsRoomController::class, 'snapshot']);
+    });
+
+    // News
     Route::get('/news', [NewsController::class, 'index']);
     Route::get('/news/{news}', [NewsController::class, 'show']);
 
