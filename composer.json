@@ -55,6 +55,9 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
+        ],
+        "test:cr": [
+            "@php artisan test --filter=CapitalRivals"
         ]
     },
     "extra": {
