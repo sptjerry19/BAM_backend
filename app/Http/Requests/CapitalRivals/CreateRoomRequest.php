@@ -18,6 +18,8 @@ class CreateRoomRequest extends FormRequest
     {
         return [
             'name' => 'nullable|string|max:32',
+            'entry_fee' => 'sometimes|integer|min:0|max:1000000',
+            'winnings_target' => 'sometimes|integer|min:1500000|max:100000000',
         ];
     }
 }

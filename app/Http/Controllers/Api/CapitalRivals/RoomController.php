@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api\CapitalRivals;
 
+use App\Exceptions\CapitalRivalsException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CapitalRivals\BuyTileRequest;
 use App\Http\Requests\CapitalRivals\CreateRoomRequest;
+use App\Http\Requests\CapitalRivals\GameActionRequest;
 use App\Http\Requests\CapitalRivals\JoinRoomRequest;
 use App\Http\Requests\CapitalRivals\ReadyRoomRequest;
-use App\Exceptions\CapitalRivalsException;
 use App\Services\CapitalRivals\RoomService;
 use App\Services\CapitalRivals\TurnService;
 use Illuminate\Http\JsonResponse;
@@ -17,14 +19,14 @@ class RoomController extends Controller
     public function __construct(
         private readonly RoomService $rooms,
         private readonly TurnService $turns,
-    ) {
-    }
+    ) {}
 
     public function store(CreateRoomRequest $request): JsonResponse
     {
         $data = $this->rooms->create(
             $request->validated('name'),
             $request->user('api')?->id,
+            $request->safe()->only(['entry_fee', 'winnings_target']),
         );
 
         return $this->success($data, __('messages.created'), 201);
@@ -41,6 +43,13 @@ class RoomController extends Controller
         );
 
         return $this->success($data);
+    }
+
+    public function action(GameActionRequest $request, string $code): JsonResponse
+    {
+        $data = $request->validated();
+
+        return $this->success($this->turns->action($code, $this->requireToken($request), $data['action'], isset($data['tile_index']) ? (int) $data['tile_index'] : null));
     }
 
     public function ready(ReadyRoomRequest $request, string $code): JsonResponse
@@ -74,9 +83,9 @@ class RoomController extends Controller
         return $this->success($this->turns->roll($code, $this->requireToken($request)));
     }
 
-    public function buy(Request $request, string $code): JsonResponse
+    public function buy(BuyTileRequest $request, string $code): JsonResponse
     {
-        return $this->success($this->turns->buy($code, $this->requireToken($request)));
+        return $this->success($this->turns->buy($code, $this->requireToken($request), (int) $request->validated('level', 1)));
     }
 
     public function skip(Request $request, string $code): JsonResponse

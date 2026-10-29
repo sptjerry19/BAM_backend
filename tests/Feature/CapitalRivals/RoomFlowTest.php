@@ -3,12 +3,12 @@
 namespace Tests\Feature\CapitalRivals;
 
 use App\Support\CapitalRivals\MatchStatus;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Concerns\UsesCapitalRivalsDatabase;
 use Tests\TestCase;
 
 class RoomFlowTest extends TestCase
 {
-    use DatabaseTransactions;
+    use UsesCapitalRivalsDatabase;
 
     public function test_host_cannot_start_alone(): void
     {
@@ -27,7 +27,7 @@ class RoomFlowTest extends TestCase
         $create->assertCreated();
         $create->assertJsonPath('success', true);
         $create->assertJsonPath('data.room.status', MatchStatus::WAITING_FOR_PLAYERS);
-        $create->assertJsonPath('data.room.tile_count', 40);
+        $create->assertJsonPath('data.room.tile_count', 32);
         $code = $create->json('data.room.code');
         $hostToken = $create->json('data.you.player_token');
         $this->assertNotEmpty($hostToken);
@@ -53,7 +53,7 @@ class RoomFlowTest extends TestCase
         $this->assertContains($start->json('data.room.current_seat'), [0, 1]);
         $this->assertCount(2, $start->json('data.players'));
         foreach ($start->json('data.players') as $player) {
-            $this->assertSame(1500, $player['cash']);
+            $this->assertSame(1400000, $player['cash']);
             $this->assertSame(0, $player['position']);
             $this->assertArrayNotHasKey('player_token', $player);
         }

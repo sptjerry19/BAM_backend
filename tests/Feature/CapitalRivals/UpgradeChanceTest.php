@@ -7,14 +7,14 @@ use App\Models\CapitalRivals\Player;
 use App\Models\CapitalRivals\Room;
 use App\Services\CapitalRivals\ChanceDeck;
 use App\Services\CapitalRivals\DiceService;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Concerns\UsesCapitalRivalsDatabase;
 use Tests\Concerns\CreatesCapitalRivalsMatch;
 use Tests\TestCase;
 
 class UpgradeChanceTest extends TestCase
 {
     use CreatesCapitalRivalsMatch;
-    use DatabaseTransactions;
+    use UsesCapitalRivalsDatabase;
 
     protected function tearDown(): void
     {
@@ -36,7 +36,7 @@ class UpgradeChanceTest extends TestCase
         BoardProperty::query()->create(['room_id' => $room->id, 'tile_index' => 3, 'owner_seat' => $seat, 'level' => 0]);
         $up = $this->postJson("/api/games/cr/rooms/{$code}/upgrade", ['tile_index' => 1], ['X-Player-Token' => $first]);
         $up->assertOk();
-        $this->assertSame(1, collect($up->json('data.properties'))->firstWhere('tile_index', 1)['level']);
+        $this->assertSame(2, collect($up->json('data.properties'))->firstWhere('tile_index', 1)['level']);
         $cash = collect($up->json('data.players'))->firstWhere('seat', $seat)['cash'];
         $this->assertSame(1470, $cash);
     }

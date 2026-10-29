@@ -5,14 +5,14 @@ namespace Tests\Feature\CapitalRivals;
 use App\Models\CapitalRivals\Player;
 use App\Services\CapitalRivals\DiceService;
 use App\Support\CapitalRivals\MatchStatus;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Concerns\UsesCapitalRivalsDatabase;
 use Tests\Concerns\CreatesCapitalRivalsMatch;
 use Tests\TestCase;
 
 class TurnLoopTest extends TestCase
 {
     use CreatesCapitalRivalsMatch;
-    use DatabaseTransactions;
+    use UsesCapitalRivalsDatabase;
 
     protected function tearDown(): void
     {
@@ -82,7 +82,7 @@ class TurnLoopTest extends TestCase
         [$code, $first] = $this->startedPair();
         $snap = $this->getJson("/api/games/cr/rooms/{$code}", ['X-Player-Token' => $first]);
         $seat = $snap->json('data.you.seat');
-        Player::query()->where('player_token', $first)->update(['position' => 38]);
+        Player::query()->where('player_token', $first)->update(['position' => 30]);
 
         $roll = $this->postJson("/api/games/cr/rooms/{$code}/roll", [], ['X-Player-Token' => $first]);
         $roll->assertOk();

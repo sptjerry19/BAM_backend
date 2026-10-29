@@ -1,6 +1,16 @@
 <?php
 
 return [
+    'cr_lap_required' => 'Cần hoàn thành một vòng trước khi xây nhà cấp 3.',
+    'cr_invalid_stake' => 'Tiền cược phải nhỏ hơn vốn ban đầu.',
+    'cr_action_unavailable' => 'Không thể thực hiện lựa chọn này vào lúc này.',
+    'cr_insufficient_gold' => 'Không đủ vàng để gieo lại.',
+    'cr_island_required' => 'Bạn đang ở đảo. Chọn chờ hoặc trả phí để rời đảo.',
+    'cr_insufficient_cash' => 'Không đủ tiền để thực hiện lựa chọn này.',
+    'cr_city_required' => 'Hãy chọn một ô thành phố.',
+    'cr_hotel_protected' => 'Khách sạn không thể bị thâu tóm.',
+    'cr_target_not_met' => 'Chưa đạt mức tài sản để nhận thưởng.',
+    'cr_initial_house_level' => 'Lần đầu chỉ được mua nhà từ cấp 1 đến cấp 3.',
     'ok' => 'Thành công',
     'created' => 'Tạo mới thành công.',
     'updated' => 'Cập nhật thành công.',
@@ -58,6 +68,11 @@ return [
     ],
 
     'attributes' => [
+        'entry_fee' => 'tiền cược',
+        'winnings_target' => 'mục tiêu tài sản',
+        'action' => 'lựa chọn',
+        'tile_index' => 'ô đích',
+        'level' => 'cấp nhà',
         'id' => 'mã',
         'name' => 'tên',
         'email' => 'email',

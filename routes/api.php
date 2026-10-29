@@ -60,6 +60,7 @@ Route::group([
         Route::post('/rooms/{code}/start', [CapitalRivalsRoomController::class, 'start']);
         Route::post('/rooms/{code}/leave', [CapitalRivalsRoomController::class, 'leave']);
         Route::post('/rooms/{code}/roll', [CapitalRivalsRoomController::class, 'roll']);
+        Route::post('/rooms/{code}/action', [CapitalRivalsRoomController::class, 'action']);
         Route::post('/rooms/{code}/buy', [CapitalRivalsRoomController::class, 'buy']);
         Route::post('/rooms/{code}/skip', [CapitalRivalsRoomController::class, 'skip']);
         Route::post('/rooms/{code}/pay', [CapitalRivalsRoomController::class, 'pay']);

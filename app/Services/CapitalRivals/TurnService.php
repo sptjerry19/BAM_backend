@@ -13,9 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class TurnService
 {
-    public function __construct(private readonly RoomService $rooms)
-    {
-    }
+    public function __construct(private readonly RoomService $rooms) {}
 
     public function tick(string $code, ?string $token = null): array
     {
@@ -45,6 +43,9 @@ class TurnService
             $this->assertTurn($room, $player);
             $pending = $room->state['pending'] ?? null;
             $canSkipBuy = ($pending['action'] ?? null) === 'buy';
+            if (GameRules::enabled($room->settings) && ! $pending && GameRules::stats($room, (int) $player->seat)['island_turns'] > 0) {
+                throw new CapitalRivalsException('invalid_state', __('messages.cr_island_required'));
+            }
             $canForfeit = $room->phase === MatchStatus::WAITING_FOR_ACTION && ! $pending;
             if (! $canSkipBuy && ! $canForfeit) {
                 throw new CapitalRivalsException('invalid_state', 'Cannot end the turn now.');
@@ -92,7 +93,21 @@ class TurnService
             $count = (int) ($room->settings['dice_count'] ?? 2);
             $sides = (int) ($room->settings['dice_sides'] ?? 6);
             $dice = DiceService::roll($count, $sides);
-            $moved = MovementService::advance((int) $player->position, array_sum($dice), 40);
+            if (GameRules::enabled($room->settings)) {
+                if (GameRules::stats($room, (int) $player->seat)['island_turns'] > 0) {
+                    throw new CapitalRivalsException('invalid_state', __('messages.cr_island_required'));
+                }
+                $state = $room->state ?? [];
+                $state['dice'] = $dice;
+                $room->state = $state;
+                $this->setPending($room, ['action' => 'roll_choice', 'origin' => (int) $player->position, 'dice' => $dice]);
+                $room->phase = MatchStatus::RESOLVING_TILE;
+                $room->version++;
+                $room->save();
+
+                return $this->rooms->payload($room->fresh(['players', 'properties']), $player);
+            }
+            $moved = MovementService::advance((int) $player->position, array_sum($dice), count($room->settings['tiles'] ?? []));
             $player->position = $moved['position'];
             if ($moved['laps'] > 0) {
                 $reward = (int) ($room->settings['start_reward'] ?? 200) * $moved['laps'];
@@ -113,9 +128,9 @@ class TurnService
         });
     }
 
-    public function buy(string $code, string $token): array
+    public function buy(string $code, string $token, int $level = 1): array
     {
-        return $this->mutate($code, function () use ($code, $token) {
+        return $this->mutate($code, function () use ($code, $token, $level) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
             if ($expired = $this->payloadIfExpired($room, $player)) {
@@ -126,11 +141,12 @@ class TurnService
             if (($pending['action'] ?? null) !== 'buy') {
                 throw new CapitalRivalsException('invalid_state', 'Nothing to buy.');
             }
-            $price = (int) $pending['price'];
+            $tileIndex = (int) $pending['tile'];
+            $tile = $this->tileAt($room, $tileIndex);
+            $price = HousePurchase::price($tile, $level, $room->settings, (int) GameRules::stats($room, (int) $player->seat)['laps']);
             if ((int) $player->cash < $price) {
                 throw new CapitalRivalsException('insufficient_funds', 'Not enough cash to buy.');
             }
-            $tileIndex = (int) $pending['tile'];
             if ($room->properties->firstWhere('tile_index', $tileIndex)) {
                 throw new CapitalRivalsException('invalid_state', 'Tile already owned.');
             }
@@ -139,7 +155,7 @@ class TurnService
             $room->properties()->create([
                 'tile_index' => $tileIndex,
                 'owner_seat' => $player->seat,
-                'level' => 0,
+                'level' => ($tile['type'] ?? '') === 'property' ? $level : 0,
             ]);
             $this->advanceTurn($room);
             $room->version++;
@@ -159,7 +175,7 @@ class TurnService
             }
             $this->assertTurn($room, $player);
             $pending = $room->state['pending'] ?? null;
-            if (($pending['action'] ?? null) !== 'buy') {
+            if (! in_array($pending['action'] ?? null, GameRules::enabled($room->settings) ? ['buy', 'upgrade', 'travel', 'festival', 'takeover'] : ['buy'], true)) {
                 throw new CapitalRivalsException('invalid_state', 'Nothing to skip.');
             }
             $this->advanceTurn($room);
@@ -188,7 +204,7 @@ class TurnService
                 throw new CapitalRivalsException('invalid_state', 'Nothing to pay.');
             }
             $this->settlePay($room, $player, $key ?: $this->payKey($room, $pending), $pending);
-            if ($room->status !== MatchStatus::FINISHED) {
+            if ($room->status !== MatchStatus::FINISHED && ! $this->offerTakeover($room, $player, $pending)) {
                 $this->advanceTurn($room);
             }
             $room->version++;
@@ -229,7 +245,11 @@ class TurnService
             }
             $this->assertTurn($room, $player);
             $pending = $room->state['pending'] ?? null;
-            if ($room->phase !== MatchStatus::WAITING_FOR_ACTION || $pending) {
+            $modern = GameRules::enabled($room->settings);
+            $valid = $modern
+                ? ($pending['action'] ?? null) === 'upgrade' && (int) ($pending['tile'] ?? -1) === $tileIndex && (int) $player->position === $tileIndex
+                : $room->phase === MatchStatus::WAITING_FOR_ACTION && ! $pending;
+            if (! $valid) {
                 throw new CapitalRivalsException('invalid_state', 'Cannot upgrade now.');
             }
             $tile = $this->tileAt($room, $tileIndex);
@@ -240,26 +260,178 @@ class TurnService
             if (! $owned || (int) $owned->owner_seat !== (int) $player->seat) {
                 throw new CapitalRivalsException('forbidden', 'You do not own this tile.', 403);
             }
-            $max = (int) ($room->settings['max_upgrade_level'] ?? 4);
+            $max = min(4, (int) ($room->settings['max_upgrade_level'] ?? 4));
             if ((int) $owned->level >= $max) {
                 throw new CapitalRivalsException('invalid_state', 'Already at max level.');
             }
             $group = (string) ($tile['group'] ?? '');
-            if (! PropertyUpgrade::ownsGroup((int) $player->seat, $group, $room->properties, $room->settings['tiles'] ?? [])) {
+            if (! $modern && ! PropertyUpgrade::ownsGroup((int) $player->seat, $group, $room->properties, $room->settings['tiles'] ?? [])) {
                 throw new CapitalRivalsException('invalid_state', 'Own the full group before upgrading.');
+            }
+            if ($modern && max(1, (int) $owned->level) + 1 >= 3 && GameRules::stats($room, (int) $player->seat)['laps'] < 1) {
+                throw new CapitalRivalsException('invalid_state', __('messages.cr_lap_required'));
             }
             $cost = PropertyUpgrade::cost($tile, $room->settings);
             if ((int) $player->cash < $cost) {
                 throw new CapitalRivalsException('insufficient_funds', 'Not enough cash to upgrade.');
             }
             $this->debit($room, $player, $cost, 'upgrade', $tileIndex, null);
-            $owned->level = (int) $owned->level + 1;
+            $owned->level = max(1, (int) $owned->level) + 1;
             $owned->save();
+            if ($modern) {
+                $this->advanceTurn($room);
+            }
             $room->version++;
             $room->save();
 
             return $this->rooms->payload($room->fresh(['players', 'properties']), $player);
         });
+    }
+
+    public function action(string $code, string $token, string $action, ?int $target = null): array
+    {
+        return $this->mutate($code, function () use ($code, $token, $action, $target) {
+            $room = $this->rooms->lockRoom($code);
+            $player = $this->rooms->playerByToken($room, $token);
+            if ($expired = $this->payloadIfExpired($room, $player)) {
+                return $expired;
+            }
+            $this->assertTurn($room, $player);
+            if (! GameRules::enabled($room->settings)) {
+                throw new CapitalRivalsException('invalid_state', __('messages.cr_action_unavailable'));
+            }
+            $pending = $room->state['pending'] ?? null;
+            $stats = GameRules::stats($room, (int) $player->seat);
+            if (in_array($action, ['confirm_roll', 'reroll'], true)) {
+                if (($pending['action'] ?? '') !== 'roll_choice') {
+                    throw new CapitalRivalsException('invalid_state', __('messages.cr_action_unavailable'));
+                }
+                if ($action === 'reroll') {
+                    $cost = (int) ($room->settings['reroll_cost'] ?? 3);
+                    if ($stats['gold'] < $cost) {
+                        throw new CapitalRivalsException('insufficient_gold', __('messages.cr_insufficient_gold'));
+                    }
+                    GameRules::update($room, (int) $player->seat, ['gold' => $stats['gold'] - $cost]);
+                    $dice = DiceService::roll((int) ($room->settings['dice_count'] ?? 2), (int) ($room->settings['dice_sides'] ?? 6));
+                    $state = $room->state;
+                    $state['dice'] = $dice;
+                    $state['pending']['dice'] = $dice;
+                    $room->state = $state;
+                    $this->ledger($room, 'reroll', $player->id, null, $cost, null);
+                } else {
+                    $this->commitRoll($room, $player, $pending['dice']);
+                }
+            } elseif (in_array($action, ['escape_island', 'wait_island'], true)) {
+                if ($pending || $stats['island_turns'] < 1) {
+                    throw new CapitalRivalsException('invalid_state', __('messages.cr_action_unavailable'));
+                }
+                if ($action === 'wait_island') {
+                    GameRules::update($room, (int) $player->seat, ['island_turns' => $stats['island_turns'] - 1]);
+                    $this->ledger($room, 'island_wait', $player->id, null, 0, (int) $player->position);
+                    $this->advanceTurn($room);
+                } else {
+                    $fee = (int) ($room->settings['island_fee'] ?? 200000);
+                    if ($player->cash < $fee) {
+                        throw new CapitalRivalsException('insufficient_funds', __('messages.cr_insufficient_cash'));
+                    }
+                    $this->debit($room, $player, $fee, 'island_exit', (int) $player->position, null);
+                    GameRules::update($room, (int) $player->seat, ['island_turns' => 0]);
+                }
+            } elseif (in_array($action, ['travel', 'festival'], true)) {
+                if (($pending['action'] ?? '') !== $action || $target === null || $target === (int) $player->position) {
+                    throw new CapitalRivalsException('invalid_state', __('messages.cr_action_unavailable'));
+                }
+                $tile = $this->tileAt($room, $target);
+                if ($action === 'festival') {
+                    if (($tile['type'] ?? '') !== 'property') {
+                        throw new CapitalRivalsException('invalid_state', __('messages.cr_city_required'));
+                    }
+                    $state = $room->state;
+                    $state['festivals'][$target] = min(5, (int) ($state['festivals'][$target] ?? 1) + 1);
+                    $room->state = $state;
+                    $this->ledger($room, 'festival', $player->id, null, 0, $target);
+                    $this->advanceTurn($room);
+                } else {
+                    $fee = (int) ($room->settings['travel_fee'] ?? 50000);
+                    if ($player->cash < $fee) {
+                        throw new CapitalRivalsException('insufficient_funds', __('messages.cr_insufficient_cash'));
+                    }
+                    $this->debit($room, $player, $fee, 'travel', (int) $player->position, null);
+                    $player->position = $target;
+                    $player->save();
+                    $state = $room->state;
+                    $state['pending'] = null;
+                    $room->state = $state;
+                    $this->resolveLanding($room, $player);
+                }
+            } elseif (in_array($action, ['takeover', 'decline_takeover'], true)) {
+                if (($pending['action'] ?? '') !== 'takeover') {
+                    throw new CapitalRivalsException('invalid_state', __('messages.cr_action_unavailable'));
+                }
+                if ($action === 'takeover') {
+                    $tile = $this->tileAt($room, (int) $pending['tile']);
+                    $owned = $room->properties->firstWhere('tile_index', (int) $tile['index']);
+                    $owner = $owned ? $room->players->firstWhere('seat', $owned->owner_seat) : null;
+                    if (! $owned || ! $owner || $owned->owner_seat === $player->seat || $owned->level >= 4 || ($tile['type'] ?? '') !== 'property') {
+                        throw new CapitalRivalsException('invalid_state', __('messages.cr_hotel_protected'));
+                    }
+                    $price = 2 * GameRules::propertyValue($tile, (int) $owned->level, $room->settings);
+                    if ($player->cash < $price) {
+                        throw new CapitalRivalsException('insufficient_funds', __('messages.cr_insufficient_cash'));
+                    }
+                    $this->transfer($room, $player, $owner, $price, 'takeover', (int) $tile['index']);
+                    $owned->owner_seat = $player->seat;
+                    $owned->save();
+                }
+                $this->advanceTurn($room);
+            } elseif ($action === 'accept_winnings') {
+                $targetWorth = (int) ($room->settings['winnings_target'] ?? 0);
+                if ($pending || $targetWorth <= 0 || GameRules::netWorth($room, $player) < $targetWorth) {
+                    throw new CapitalRivalsException('invalid_state', __('messages.cr_target_not_met'));
+                }
+                $this->finishMatch($room, (int) $player->seat, 'accept_winnings', $room->state ?? []);
+            } else {
+                throw new CapitalRivalsException('invalid_state', __('messages.cr_action_unavailable'));
+            }
+            $room->version++;
+            $room->save();
+
+            return $this->rooms->payload($room->fresh(['players', 'properties']), $player);
+        });
+    }
+
+    private function commitRoll(Room $room, Player $player, array $dice): void
+    {
+        $moved = MovementService::advance((int) $player->position, array_sum($dice), count($room->settings['tiles']));
+        $state = $room->state ?? [];
+        $state['pending'] = null;
+        $room->state = $state;
+        $player->position = $moved['position'];
+        if ($moved['laps'] > 0) {
+            $stats = GameRules::stats($room, (int) $player->seat);
+            GameRules::update($room, (int) $player->seat, ['laps' => $stats['laps'] + $moved['laps']]);
+            $this->credit($room, $player, (int) ($room->settings['start_reward'] ?? 300000) * $moved['laps'], 'start_bonus', 0);
+        }
+        $player->save();
+        $room->phase = MatchStatus::RESOLVING_TILE;
+        $this->resolveLanding($room, $player);
+    }
+
+    private function offerTakeover(Room $room, Player $player, array $pending): bool
+    {
+        if (! GameRules::enabled($room->settings) || $player->bankrupt || ($pending['kind'] ?? '') !== 'rent') {
+            return false;
+        }
+        $tile = $this->tileAt($room, (int) $pending['tile']);
+        $owned = $room->properties->firstWhere('tile_index', (int) $tile['index']);
+        if (! $owned || ($tile['type'] ?? '') !== 'property' || (int) $owned->level >= 4) {
+            return false;
+        }
+        $price = 2 * GameRules::propertyValue($tile, (int) $owned->level, $room->settings);
+        $this->setPending($room, ['action' => 'takeover', 'tile' => (int) $tile['index'], 'name' => $tile['name'], 'price' => $price]);
+        $room->phase = MatchStatus::RESOLVING_TILE;
+
+        return true;
     }
 
     private function assertTurn(Room $room, Player $player): void
@@ -272,10 +444,34 @@ class TurnService
         }
     }
 
+    private function islandPosition(Room $room): int
+    {
+        foreach ($room->settings['tiles'] ?? [] as $tile) {
+            if (($tile['special'] ?? '') === 'island' || ($tile['type'] ?? '') === 'detention') {
+                return (int) $tile['index'];
+            }
+        }
+
+        return 0;
+    }
+
     private function resolveLanding(Room $room, Player $player): void
     {
         $tile = $this->tileAt($room, (int) $player->position);
         $type = $tile['type'] ?? 'rest';
+        $modern = GameRules::enabled($room->settings);
+        if ($modern && (($tile['special'] ?? '') === 'island' || $type === 'detention')) {
+            GameRules::update($room, (int) $player->seat, ['island_turns' => (int) ($room->settings['island_turns'] ?? 3)]);
+            $this->advanceTurn($room);
+
+            return;
+        }
+        if ($modern && in_array($tile['special'] ?? '', ['airport', 'championship', 'world_tour'], true)) {
+            $this->setPending($room, ['action' => ($tile['special'] ?? '') === 'airport' ? 'travel' : 'festival', 'tile' => (int) $tile['index'], 'name' => $tile['name']]);
+            $room->phase = MatchStatus::RESOLVING_TILE;
+
+            return;
+        }
 
         if (in_array($type, ['property', 'service'], true)) {
             $owned = $room->properties->firstWhere('tile_index', (int) $tile['index']);
@@ -291,11 +487,23 @@ class TurnService
                 return;
             }
             if ((int) $owned->owner_seat === (int) $player->seat) {
+                if ($modern && $type === 'property' && (int) $owned->level < 4) {
+                    $next = max(1, (int) $owned->level) + 1;
+                    if ($next <= 2 || GameRules::stats($room, (int) $player->seat)['laps'] >= 1) {
+                        $this->setPending($room, ['action' => 'upgrade', 'tile' => (int) $tile['index'], 'name' => $tile['name'], 'level' => $next, 'price' => PropertyUpgrade::cost($tile, $room->settings)]);
+                        $room->phase = MatchStatus::RESOLVING_TILE;
+
+                        return;
+                    }
+                }
                 $this->advanceTurn($room);
 
                 return;
             }
             $rent = RentCalculator::amount($tile, (int) $owned->owner_seat, $room->properties, $room->settings['tiles'] ?? []);
+            if ($modern) {
+                $rent *= max(1, (int) ($room->state['festivals'][$tile['index']] ?? 1));
+            }
             $this->setPending($room, [
                 'action' => 'pay',
                 'kind' => 'rent',
@@ -314,7 +522,7 @@ class TurnService
                 'action' => 'pay',
                 'kind' => 'tax',
                 'tile' => (int) $tile['index'],
-                'amount' => (int) ($tile['amount'] ?? 0),
+                'amount' => $modern ? (int) ceil(GameRules::netWorth($room, $player) * (float) ($room->settings['tax_rate'] ?? 0.10)) : (int) ($tile['amount'] ?? 0),
                 'to_seat' => null,
                 'name' => $tile['name'] ?? '',
             ]);
@@ -335,7 +543,7 @@ class TurnService
         }
 
         if ($type === 'go_to_detention') {
-            $player->position = 10;
+            $player->position = $this->islandPosition($room);
             $player->save();
             $this->advanceTurn($room);
 
@@ -367,6 +575,17 @@ class TurnService
         $current = $room->players->firstWhere('seat', $room->current_seat);
         $pending = $room->state['pending'] ?? null;
         $action = $pending['action'] ?? null;
+        if ($current && GameRules::enabled($room->settings) && $action === 'roll_choice') {
+            $this->commitRoll($room, $current, $pending['dice']);
+
+            return true;
+        }
+        if ($current && GameRules::enabled($room->settings) && ! $pending) {
+            $stats = GameRules::stats($room, (int) $current->seat);
+            if ($stats['island_turns'] > 0) {
+                GameRules::update($room, (int) $current->seat, ['island_turns' => $stats['island_turns'] - 1]);
+            }
+        }
         if ($current && $action === 'pay') {
             $this->settlePay($room, $current, $this->payKey($room, $pending, 'timeout'), $pending);
             if ($room->status !== MatchStatus::FINISHED) {
@@ -406,7 +625,7 @@ class TurnService
 
     private function advanceTurn(Room $room): void
     {
-        $room->load('players');
+        $room->load(['players', 'properties']);
         $alive = $room->players->where('bankrupt', false)->sortBy('turn_order')->values();
         $state = $room->state ?? [];
         $state['pending'] = null;
@@ -416,6 +635,15 @@ class TurnService
             $this->finishMatch($room, $alive->first()?->seat, 'last_standing', $state);
 
             return;
+        }
+        if (GameRules::enabled($room->settings)) {
+            foreach ($alive as $contender) {
+                if ($reason = GameRules::monopoly($room, (int) $contender->seat)) {
+                    $this->finishMatch($room, (int) $contender->seat, $reason, $state);
+
+                    return;
+                }
+            }
         }
 
         $maxTurns = (int) ($room->settings['max_turns'] ?? 0);
@@ -440,6 +668,16 @@ class TurnService
      */
     private function finishMatch(Room $room, ?int $winnerSeat, string $reason, array $state): void
     {
+        if (GameRules::enabled($room->settings) && $winnerSeat !== null && empty($state['pot_paid'])) {
+            $winner = $room->players->firstWhere('seat', $winnerSeat);
+            $pot = (int) ($state['pot'] ?? 0);
+            if ($winner && $pot > 0) {
+                $this->credit($room, $winner, $pot, 'winnings', null);
+                $state['player_stats'][$winnerSeat]['winnings'] = (int) ($state['player_stats'][$winnerSeat]['winnings'] ?? 0) + $pot;
+            }
+            $state['pot_paid'] = true;
+            $state['pot'] = 0;
+        }
         $room->status = MatchStatus::FINISHED;
         $room->phase = MatchStatus::FINISHED;
         $room->finished_at = now();
@@ -490,6 +728,9 @@ class TurnService
         $state = $room->state ?? [];
         $state['pending'] = $pending;
         $room->state = $state;
+        if (GameRules::enabled($room->settings)) {
+            $room->turn_deadline = now()->addSeconds((int) ($room->settings['turn_timeout'] ?? 30));
+        }
     }
 
     private function credit(Room $room, Player $player, int $amount, string $type, ?int $tile): void
@@ -572,8 +813,23 @@ class TurnService
 
     private function resolveCard(Room $room, Player $player): void
     {
+        $cashBefore = (int) $player->cash;
+        $positionBefore = (int) $player->position;
         $state = $room->state ?? [];
-        $card = ChanceDeck::draw($state);
+        $modern = GameRules::enabled($room->settings);
+        $card = ChanceDeck::draw($state, $modern);
+        if ($modern && isset($card['amount'])) {
+            $oldAmount = (int) $card['amount'];
+            $card['amount'] = $oldAmount * 1000;
+            $card['text'] = str_replace('$'.$oldAmount, '$'.number_format($card['amount']), $card['text']);
+        }
+        if (($card['id'] ?? '') === 'recall_gate') {
+            $card['position'] = $this->islandPosition($room);
+        }
+        if (($card['kind'] ?? '') === 'go_start') {
+            $card['amount'] = (int) ($room->settings['start_reward'] ?? 200);
+            $card['position'] = 0;
+        }
         $state['last_card'] = $card;
         $state['pending'] = null;
         $room->state = $state;
@@ -584,13 +840,54 @@ class TurnService
         } elseif ($kind === 'debit') {
             $this->debit($room, $player, (int) ($card['amount'] ?? 0), 'chance', (int) $player->position, null);
         } elseif ($kind === 'move') {
-            $player->position = (int) ($card['position'] ?? 10);
+            $player->position = (int) ($card['position'] ?? $this->islandPosition($room));
             $player->save();
+            if ($modern && $player->position === $this->islandPosition($room)) {
+                GameRules::update($room, (int) $player->seat, ['island_turns' => (int) ($room->settings['island_turns'] ?? 3)]);
+            }
         } elseif ($kind === 'go_start') {
             $player->position = 0;
             $player->save();
             $this->credit($room, $player, (int) ($room->settings['start_reward'] ?? 200), 'start_bonus', 0);
+        } elseif ($modern && $kind === 'earthquake') {
+            foreach ($room->properties as $property) {
+                $tile = $this->tileAt($room, (int) $property->tile_index);
+                if (($tile['type'] ?? '') === 'property' && $property->level > 1 && $property->level < 4) {
+                    $property->level--;
+                    $property->save();
+                }
+            }
+        } elseif ($modern && $kind === 'takeover') {
+            $candidates = $room->properties->filter(fn ($property) => (int) $property->owner_seat !== (int) $player->seat && (int) $property->level < 4 && ($this->tileAt($room, (int) $property->tile_index)['type'] ?? '') === 'property');
+            if ($candidates->isNotEmpty()) {
+                $owned = $candidates->random();
+                $owned->owner_seat = $player->seat;
+                $owned->save();
+                $card['tile_index'] = (int) $owned->tile_index;
+            }
+        } elseif ($modern && $kind === 'festival') {
+            $cities = array_values(array_filter($room->settings['tiles'], fn ($tile) => $tile['type'] === 'property'));
+            if ($cities !== []) {
+                $city = $cities[array_rand($cities)];
+                $state = $room->state;
+                $state['festivals'][$city['index']] = min(5, (int) ($state['festivals'][$city['index']] ?? 1) + 1);
+                $room->state = $state;
+                $card['tile_index'] = (int) $city['index'];
+            }
         }
+
+        $player->refresh();
+        $state = $room->state ?? [];
+        $state['last_card'] = [
+            ...$card,
+            'draw_id' => $room->id.'-'.($room->version + 1),
+            'player_name' => $player->name,
+            'cash_change' => (int) $player->cash - $cashBefore,
+            'position_before' => $positionBefore,
+            'position_after' => (int) $player->position,
+            'bankrupt' => (bool) $player->bankrupt,
+        ];
+        $room->state = $state;
 
         if ($room->status !== MatchStatus::FINISHED) {
             $this->advanceTurn($room);
@@ -599,6 +896,7 @@ class TurnService
 
     /**
      * @template T
+     *
      * @param  callable(): T  $fn
      * @return T
      */

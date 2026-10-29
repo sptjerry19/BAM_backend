@@ -5,14 +5,14 @@ namespace Tests\Feature\CapitalRivals;
 use App\Models\CapitalRivals\Room;
 use App\Services\CapitalRivals\DiceService;
 use App\Support\CapitalRivals\MatchStatus;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Tests\Concerns\UsesCapitalRivalsDatabase;
 use Tests\Concerns\CreatesCapitalRivalsMatch;
 use Tests\TestCase;
 
 class TimeoutVictoryTest extends TestCase
 {
     use CreatesCapitalRivalsMatch;
-    use DatabaseTransactions;
+    use UsesCapitalRivalsDatabase;
 
     protected function tearDown(): void
     {

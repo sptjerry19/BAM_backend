@@ -29,4 +29,19 @@ class ChanceDeckTest extends TestCase
         $this->assertCount(6, ChanceDeck::cards());
         $this->assertArrayHasKey('harbor_gate', ChanceDeck::cards());
     }
+
+    public function test_shuffled_deck_draws_every_card_once_before_reshuffling(): void
+    {
+        $state = [];
+        $drawn = [];
+        foreach (range(1, count(ChanceDeck::cards())) as $_) {
+            $drawn[] = ChanceDeck::draw($state)['id'];
+        }
+        sort($drawn);
+        $expected = array_keys(ChanceDeck::cards());
+        sort($expected);
+        $this->assertSame($expected, $drawn);
+        $this->assertSame([], $state['chance_draw']);
+        $this->assertArrayHasKey(ChanceDeck::draw($state)['id'], ChanceDeck::cards());
+    }
 }

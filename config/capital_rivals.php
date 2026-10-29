@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'world_tour' => [
+        'starting_cash' => 1500000, 'start_reward' => 300000,
+        'entry_fee' => 100000, 'starting_gold' => 15, 'reroll_cost' => 3,
+        'island_fee' => 200000, 'island_turns' => 3, 'tax_rate' => 0.10,
+        'travel_fee' => 50000, 'winnings_target' => 3000000,
+    ],
     'starting_cash' => (int) env('CR_STARTING_CASH', 1500),
     'start_reward' => (int) env('CR_START_REWARD', 200),
     'dice_count' => (int) env('CR_DICE_COUNT', 2),

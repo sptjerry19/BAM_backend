@@ -1,6 +1,16 @@
 <?php
 
 return [
+    'cr_lap_required' => 'Complete one lap before building a level 3 house.',
+    'cr_invalid_stake' => 'The stake must be less than starting capital.',
+    'cr_action_unavailable' => 'This action is not available now.',
+    'cr_insufficient_gold' => 'Not enough gold to re-roll.',
+    'cr_island_required' => 'Wait or pay to leave the island.',
+    'cr_insufficient_cash' => 'Not enough cash for this action.',
+    'cr_city_required' => 'Choose a city tile.',
+    'cr_hotel_protected' => 'Hotels cannot be taken over.',
+    'cr_target_not_met' => 'The winnings target has not been reached.',
+    'cr_initial_house_level' => 'The first house purchase must be level 1, 2 or 3.',
     'ok' => 'OK',
     'created' => 'Created successfully.',
     'updated' => 'Updated successfully.',
@@ -58,6 +68,11 @@ return [
     ],
 
     'attributes' => [
+        'entry_fee' => 'entry stake',
+        'winnings_target' => 'winnings target',
+        'action' => 'game action',
+        'tile_index' => 'destination tile',
+        'level' => 'house level',
         'id' => 'ID',
         'name' => 'name',
         'email' => 'email',

@@ -36,7 +36,8 @@ final class RentCalculator
 
         $owned = $properties->firstWhere('tile_index', (int) $tile['index']);
         $level = (int) ($owned?->level ?? 0);
-        $idx = max(0, min(count($rents) - 1, $level));
+        // Houses are now levels 1–4; legacy level-zero holdings use level 1 rent.
+        $idx = max(0, min(count($rents) - 1, max(1, $level) - 1));
 
         return (int) $rents[$idx];
     }

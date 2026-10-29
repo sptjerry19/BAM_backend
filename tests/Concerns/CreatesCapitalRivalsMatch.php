@@ -2,6 +2,8 @@
 
 namespace Tests\Concerns;
 
+use App\Models\CapitalRivals\Room;
+use App\Services\CapitalRivals\BoardDefinition;
 use App\Services\CapitalRivals\DiceService;
 
 trait CreatesCapitalRivalsMatch
@@ -27,6 +29,8 @@ trait CreatesCapitalRivalsMatch
     {
         $create = $this->postJson('/api/games/cr/rooms', ['name' => 'Host']);
         $code = $create->json('data.room.code');
+        // These scenarios retain coverage for rooms created before rules v2.
+        Room::query()->where('code', $code)->update(['settings' => BoardDefinition::settings(false)]);
         $host = $create->json('data.you.player_token');
         $join = $this->postJson("/api/games/cr/rooms/{$code}/join", ['name' => 'Guest']);
         $guest = $join->json('data.you.player_token');
