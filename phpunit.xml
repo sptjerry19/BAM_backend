@@ -20,6 +20,8 @@
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_KEY" value="base64:nugRhXRzO7LCBYtnyXJletNrpIEnCCvZoRFvg67UhpY="/>
+        <!-- Public test-only signing key; never use a developer or production key. -->
+        <env name="JWT_SECRET" value="capital-rivals-test-only-signing-key-not-for-production-0123456789" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
         <env name="CACHE_STORE" value="array"/>
