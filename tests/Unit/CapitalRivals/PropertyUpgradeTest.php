@@ -25,8 +25,8 @@ class PropertyUpgradeTest extends TestCase
 
         $full = new Collection([
             new BoardProperty(['tile_index' => 1, 'owner_seat' => 0, 'level' => 0]),
-            new BoardProperty(['tile_index' => 3, 'owner_seat' => 0, 'level' => 0]),
+            new BoardProperty(['tile_index' => 2, 'owner_seat' => 0, 'level' => 0]),
         ]);
-        $this->assertTrue(PropertyUpgrade::ownsGroup(0, 'umber', $full, $tiles));
+        $this->assertTrue(PropertyUpgrade::ownsGroup(0, 'A', $full, $tiles));
     }
 }

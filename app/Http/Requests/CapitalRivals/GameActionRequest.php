@@ -17,8 +17,8 @@ class GameActionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'action' => 'required|string|in:confirm_roll,reroll,escape_island,wait_island,travel,festival,takeover,decline_takeover,accept_winnings',
-            'tile_index' => 'required_if:action,travel,festival|integer|min:0|max:39',
+            'action' => 'required|string|in:confirm_roll,reroll,escape_island,wait_island,travel,festival,takeover,decline_takeover,accept_winnings,island_pay,island_roll,use_escape_card,championship,chance_target,use_shield,liquidate,discard_card,surrender',
+            'tile_index' => 'nullable|integer|min:0|max:31',
         ];
     }
 }

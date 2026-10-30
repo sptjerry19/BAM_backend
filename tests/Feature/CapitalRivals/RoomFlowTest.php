@@ -49,11 +49,11 @@ class RoomFlowTest extends TestCase
         $start = $this->postJson("/api/games/cr/rooms/{$code}/start", [], ['X-Player-Token' => $hostToken]);
         $start->assertOk();
         $start->assertJsonPath('data.room.status', MatchStatus::IN_PROGRESS);
-        $start->assertJsonPath('data.room.phase', MatchStatus::WAITING_FOR_ACTION);
+        $start->assertJsonPath('data.room.phase', 'PRE_ROLL');
         $this->assertContains($start->json('data.room.current_seat'), [0, 1]);
         $this->assertCount(2, $start->json('data.players'));
         foreach ($start->json('data.players') as $player) {
-            $this->assertSame(1400000, $player['cash']);
+            $this->assertSame(2000000, $player['cash']);
             $this->assertSame(0, $player['position']);
             $this->assertArrayNotHasKey('player_token', $player);
         }

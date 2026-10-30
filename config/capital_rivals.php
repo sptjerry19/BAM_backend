@@ -1,6 +1,13 @@
 <?php
 
 return [
+    'business_tour_v1' => [
+        'starting_cash' => 2000000, 'start_reward' => 300000, 'match_duration' => 1800,
+        'roll_timeout' => 15, 'choice_timeout' => 20, 'debt_timeout' => 45,
+        'island_fee' => 200000, 'travel_fee' => 50000, 'championship_fee' => 50000,
+        'tax_rate' => 0.10, 'resort_price' => 200000, 'liquidation_rate' => 0.50,
+        'buyout_multiplier' => 2, 'max_rent_multiplier' => 10, 'starting_festivals' => 3,
+    ],
     'world_tour' => [
         'starting_cash' => 1500000, 'start_reward' => 300000,
         'entry_fee' => 100000, 'starting_gold' => 15, 'reroll_cost' => 3,
