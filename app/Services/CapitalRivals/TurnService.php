@@ -13,10 +13,14 @@ use Illuminate\Support\Facades\DB;
 
 class TurnService
 {
-    public function __construct(private readonly RoomService $rooms) {}
+    public function __construct(private readonly RoomService $rooms, private readonly SpecTurnService $spec) {}
 
     public function tick(string $code, ?string $token = null): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->tick($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token) {
             $room = $this->rooms->lockRoom($code);
             $viewer = $token ? $room->players->firstWhere('player_token', $token) : null;
@@ -31,6 +35,10 @@ class TurnService
 
     public function endTurn(string $code, string $token): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->endTurn($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -60,6 +68,10 @@ class TurnService
 
     public function bankrupt(string $code, string $token): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->bankrupt($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -78,6 +90,10 @@ class TurnService
 
     public function roll(string $code, string $token): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->roll($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -130,6 +146,10 @@ class TurnService
 
     public function buy(string $code, string $token, int $level = 1): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->buy($code, $token, $level);
+        }
+
         return $this->mutate($code, function () use ($code, $token, $level) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -167,6 +187,10 @@ class TurnService
 
     public function skip(string $code, string $token): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->skip($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -188,6 +212,10 @@ class TurnService
 
     public function pay(string $code, string $token, ?string $idempotencyKey = null): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->pay($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token, $idempotencyKey) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -216,6 +244,10 @@ class TurnService
 
     public function card(string $code, string $token): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->card($code, $token);
+        }
+
         return $this->mutate($code, function () use ($code, $token) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -237,6 +269,10 @@ class TurnService
 
     public function upgrade(string $code, string $token, int $tileIndex): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->upgrade($code, $token, $tileIndex);
+        }
+
         return $this->mutate($code, function () use ($code, $token, $tileIndex) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -290,6 +326,10 @@ class TurnService
 
     public function action(string $code, string $token, string $action, ?int $target = null): array
     {
+        if ($this->isV3($code)) {
+            return $this->spec->action($code, $token, $action, $target);
+        }
+
         return $this->mutate($code, function () use ($code, $token, $action, $target) {
             $room = $this->rooms->lockRoom($code);
             $player = $this->rooms->playerByToken($room, $token);
@@ -551,6 +591,13 @@ class TurnService
         }
 
         $this->advanceTurn($room);
+    }
+
+    private function isV3(string $code): bool
+    {
+        $room = Room::query()->where('code', strtoupper($code))->first(['settings']);
+
+        return $room && GameRules::isV3($room->settings ?? []);
     }
 
     private function payloadIfExpired(Room $room, ?Player $player): ?array

@@ -23,8 +23,9 @@ class BoardDefinitionTest extends TestCase
         $this->assertSame(1, $types['start'] ?? 0);
         $this->assertSame(1, $types['detention'] ?? 0);
         $this->assertSame(0, $types['go_to_detention'] ?? 0);
-        $this->assertSame(2, $types['rest'] ?? 0);
-        $this->assertSame(['start', 'island', 'world_tour', 'airport'], array_map(fn ($i) => $tiles[$i]['special'], [0, 8, 16, 24]));
-        $this->assertSame([5, 13, 21, 29], array_column(array_values(array_filter($tiles, fn ($tile) => ($tile['special'] ?? '') === 'beach')), 'index'));
+        $this->assertSame(1, $types['championship'] ?? 0);
+        $this->assertSame(1, $types['world_tour'] ?? 0);
+        $this->assertSame(['start', 'island', 'championship', 'world_tour'], array_map(fn ($i) => $tiles[$i]['special'], [0, 8, 16, 24]));
+        $this->assertSame([3, 11, 19, 27], array_column(array_values(array_filter($tiles, fn ($tile) => ($tile['special'] ?? '') === 'resort')), 'index'));
     }
 }

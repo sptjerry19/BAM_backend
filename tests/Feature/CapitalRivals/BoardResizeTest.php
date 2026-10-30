@@ -34,6 +34,7 @@ class BoardResizeTest extends TestCase
         foreach ([0 => 'start', 10 => 'detention', 20 => 'rest', 30 => 'go_to_detention', 18 => 'rest', 28 => 'rest', 34 => 'rest', 2 => 'chance', 7 => 'chance', 22 => 'chance', 36 => 'chance', 4 => 'tax', 12 => 'tax', 38 => 'tax', 5 => 'service', 15 => 'service', 25 => 'service', 35 => 'service'] as $i => $type) {
             $tiles[$i]['type'] = $type;
         }
+
         return Room::query()->create([
             'code' => 'RESIZE', 'status' => MatchStatus::IN_PROGRESS,
             'phase' => MatchStatus::RESOLVING_TILE, 'current_seat' => 0,
@@ -58,7 +59,7 @@ class BoardResizeTest extends TestCase
         $this->assertSame(7, $player->fresh()->position);
         $this->assertNull($room->fresh()->state['pending']);
         $this->assertSame(MatchStatus::WAITING_FOR_ACTION, $room->fresh()->phase);
-        $this->assertSame(['start', 'island', 'world_tour', 'airport'], array_map(fn ($i) => $snapshot['tiles'][$i]['special'], [0, 8, 16, 24]));
+        $this->assertSame(['start', 'island', 'championship', 'world_tour'], array_map(fn ($i) => $snapshot['tiles'][$i]['special'], [0, 8, 16, 24]));
         $types = array_count_values(array_column($snapshot['tiles'], 'type'));
         $this->assertSame(4, $types['service']);
         $this->assertSame(3, $types['chance']);

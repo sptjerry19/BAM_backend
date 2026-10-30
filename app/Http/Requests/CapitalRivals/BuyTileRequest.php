@@ -16,6 +16,6 @@ class BuyTileRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['level' => ['sometimes', 'integer', 'in:1,2,3']];
+        return ['level' => ['sometimes', 'integer', 'in:0,1,2,3']];
     }
 }

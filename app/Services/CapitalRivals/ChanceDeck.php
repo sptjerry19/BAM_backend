@@ -7,6 +7,48 @@ final class ChanceDeck
     /** @var string|null */
     public static $nextId = null;
 
+    /** @return array<string, array<string, mixed>> */
+    public static function specCards(): array
+    {
+        return [
+            'business_bonus' => ['title' => 'Thưởng kinh doanh', 'text' => 'Nhận $100.000.', 'kind' => 'credit', 'amount' => 100000, 'weight' => 12],
+            'admin_fine' => ['title' => 'Phí hành chính', 'text' => 'Nộp $50.000.', 'kind' => 'debit', 'amount' => 50000, 'weight' => 8],
+            'birthday' => ['title' => 'Sinh nhật', 'text' => 'Mỗi đối thủ tặng bạn $25.000.', 'kind' => 'birthday', 'amount' => 25000, 'weight' => 8],
+            'go_start' => ['title' => 'Về Xuất phát', 'text' => 'Về Xuất phát và nhận $300.000.', 'kind' => 'go_start', 'weight' => 6],
+            'go_island' => ['title' => 'Ra đảo', 'text' => 'Di chuyển đến Đảo hoang.', 'kind' => 'go_island', 'weight' => 10],
+            'go_world_tour' => ['title' => 'Vòng quanh thế giới', 'text' => 'Di chuyển đến ô Vòng quanh thế giới.', 'kind' => 'go_world_tour', 'weight' => 8],
+            'escape_card' => ['title' => 'Vé thoát đảo', 'text' => 'Giữ lại để thoát Đảo hoang.', 'kind' => 'saved', 'card' => 'island_escape', 'weight' => 10],
+            'shield_card' => ['title' => 'Lá chắn', 'text' => 'Giữ lại để bảo vệ một thành phố.', 'kind' => 'saved', 'card' => 'shield', 'weight' => 8],
+            'blackout' => ['title' => 'Mất điện', 'text' => 'Chọn một thành phố đối thủ: tiền thuê bằng 0 đến lượt sau của bạn.', 'kind' => 'target', 'effect' => 'blackout', 'weight' => 8],
+            'earthquake' => ['title' => 'Động đất', 'text' => 'Chọn một thành phố đối thủ để phá toàn bộ nhà.', 'kind' => 'target', 'effect' => 'earthquake', 'weight' => 6],
+            'free_championship' => ['title' => 'Đăng cai miễn phí', 'text' => 'Chọn một thành phố của bạn để đăng cai.', 'kind' => 'target', 'effect' => 'championship', 'weight' => 8],
+            'go_tax' => ['title' => 'Kiểm tra thuế', 'text' => 'Di chuyển đến Sở thuế và nộp thuế.', 'kind' => 'go_tax', 'weight' => 8],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function drawSpec(): array
+    {
+        if (is_string(self::$nextId) && isset(self::specCards()[self::$nextId])) {
+            $id = self::$nextId;
+            self::$nextId = null;
+        } else {
+            $roll = random_int(1, 100);
+            $id = 'business_bonus';
+            foreach (self::specCards() as $key => $card) {
+                $roll -= (int) $card['weight'];
+                if ($roll <= 0) {
+                    $id = $key;
+                    break;
+                }
+            }
+        }
+        $card = self::specCards()[$id];
+        unset($card['weight']);
+
+        return ['id' => $id, ...$card];
+    }
+
     /**
      * Original Dispatch cards — not commercial-game text.
      *

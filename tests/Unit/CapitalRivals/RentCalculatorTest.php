@@ -16,7 +16,7 @@ class RentCalculatorTest extends TestCase
         $tile = $tiles[1];
         $owned = new BoardProperty(['tile_index' => 1, 'owner_seat' => 0, 'level' => 0]);
         $amount = RentCalculator::amount($tile, 0, new Collection([$owned]), $tiles);
-        $this->assertSame(4, $amount);
+        $this->assertSame(10000, $amount);
     }
 
     public function test_level_two_uses_second_rent_band(): void
@@ -25,13 +25,13 @@ class RentCalculatorTest extends TestCase
         $tile = $tiles[1];
         $owned = new BoardProperty(['tile_index' => 1, 'owner_seat' => 0, 'level' => 2]);
         $amount = RentCalculator::amount($tile, 0, new Collection([$owned]), $tiles);
-        $this->assertSame(10, $amount);
+        $this->assertSame(30000, $amount);
     }
 
     public function test_house_rent_increases_across_all_four_levels(): void
     {
         $tiles = BoardDefinition::tiles();
-        foreach ([1 => 4, 2 => 10, 3 => 20, 4 => 40] as $level => $rent) {
+        foreach ([1 => 10000, 2 => 30000, 3 => 60000, 4 => 100000] as $level => $rent) {
             $owned = new BoardProperty(['tile_index' => 1, 'owner_seat' => 0, 'level' => $level]);
             $this->assertSame($rent, RentCalculator::amount($tiles[1], 0, new Collection([$owned]), $tiles));
         }

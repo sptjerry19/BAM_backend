@@ -15,8 +15,8 @@ class RoomService
 {
     public function create(?string $name, ?int $userId, array $options = []): array
     {
-        return DB::transaction(function () use ($name, $userId, $options) {
-            $settings = [...BoardDefinition::settings(), ...array_intersect_key($options, array_flip(['entry_fee', 'winnings_target']))];
+        return DB::transaction(function () use ($name, $userId) {
+            $settings = BoardDefinition::settings();
             $room = Room::query()->create([
                 'code' => $this->uniqueCode(),
                 'status' => MatchStatus::WAITING_FOR_PLAYERS,
@@ -90,7 +90,8 @@ class RoomService
 
             $cash = (int) ($room->settings['starting_cash'] ?? 1500);
             $modern = GameRules::enabled($room->settings);
-            $fee = $modern ? (int) ($room->settings['entry_fee'] ?? 0) : 0;
+            $v3 = GameRules::isV3($room->settings);
+            $fee = $modern && ! $v3 ? (int) ($room->settings['entry_fee'] ?? 0) : 0;
             if ($fee < 0 || $fee >= $cash) {
                 throw new CapitalRivalsException('invalid_state', __('messages.cr_invalid_stake'));
             }
@@ -106,7 +107,9 @@ class RoomService
                     'bankrupt' => false,
                 ]);
                 $seat = (int) Player::query()->whereKey($id)->value('seat');
-                $stats[$seat] = ['laps' => 0, 'gold' => (int) ($room->settings['starting_gold'] ?? 15), 'island_turns' => 0, 'stake' => $fee, 'winnings' => 0];
+                $stats[$seat] = $v3
+                    ? ['laps' => 0, 'gold' => 0, 'island_turns' => 0, 'island_failures' => 0, 'tour_waiting' => false, 'hand' => [], 'used_saved_card' => false, 'stake' => 0, 'winnings' => 0]
+                    : ['laps' => 0, 'gold' => (int) ($room->settings['starting_gold'] ?? 15), 'island_turns' => 0, 'stake' => $fee, 'winnings' => 0];
                 if ($fee > 0) {
                     LedgerEntry::query()->create(['room_id' => $room->id, 'type' => 'stake', 'from_player_id' => $id, 'amount' => $fee]);
                 }
@@ -114,9 +117,9 @@ class RoomService
 
             $first = Player::query()->findOrFail($order[0]);
             $room->status = MatchStatus::IN_PROGRESS;
-            $room->phase = MatchStatus::WAITING_FOR_ACTION;
+            $room->phase = $v3 ? 'PRE_ROLL' : MatchStatus::WAITING_FOR_ACTION;
             $room->current_seat = $first->seat;
-            $room->turn_deadline = now()->addSeconds($timeout);
+            $room->turn_deadline = now()->addSeconds($v3 ? (int) ($room->settings['roll_timeout'] ?? 15) : $timeout);
             $room->started_at = now();
             $room->version++;
             $room->state = [
@@ -125,11 +128,19 @@ class RoomService
                 'winner_seat' => null,
                 'turns_played' => 0,
                 'win_reason' => null,
-                'chance_draw' => ChanceDeck::shuffled($modern),
+                'chance_draw' => $v3 ? [] : ChanceDeck::shuffled($modern),
                 'last_card' => null,
                 'player_stats' => $stats,
                 'pot' => $fee * count($order),
-                'festivals' => $modern ? GameRules::festivals($room->settings['tiles']) : [],
+                'festivals' => $modern ? GameRules::festivals($room->settings['tiles'], $v3 ? 3 : 2) : [],
+                'turn_id' => 1,
+                'doubles_streak' => 0,
+                'championship' => null,
+                'shields' => [],
+                'blackouts' => [],
+                'pending_debt' => null,
+                'eliminated' => [],
+                'match_deadline' => $v3 ? now()->addSeconds((int) ($room->settings['match_duration'] ?? 1800))->toIso8601String() : null,
             ];
             $room->save();
 
@@ -263,6 +274,7 @@ class RoomService
     public function payload(Room $room, ?Player $viewer, bool $includeToken = false): array
     {
         $modern = GameRules::enabled($room->settings);
+        $v3 = GameRules::isV3($room->settings);
         $players = $room->players->map(fn (Player $p) => [
             'id' => $p->id,
             'seat' => $p->seat,
@@ -275,7 +287,7 @@ class RoomService
             'bankrupt' => $p->bankrupt,
             'is_host' => (int) $room->host_player_id === (int) $p->id,
             'laps' => GameRules::stats($room, (int) $p->seat)['laps'],
-            'gold' => $modern ? GameRules::stats($room, (int) $p->seat)['gold'] : 0,
+            'gold' => $modern && ! $v3 ? GameRules::stats($room, (int) $p->seat)['gold'] : 0,
             'island_turns' => GameRules::stats($room, (int) $p->seat)['island_turns'],
             'winnings' => GameRules::stats($room, (int) $p->seat)['winnings'],
             'net_worth' => GameRules::netWorth($room, $p),
@@ -298,7 +310,13 @@ class RoomService
         if ($canBuy) {
             foreach ($room->settings['tiles'] ?? [] as $tile) {
                 if ((int) $tile['index'] === (int) $pending['tile']) {
-                    $purchaseOptions = HousePurchase::options($tile, $room->settings, (int) GameRules::stats($room, (int) $viewer->seat)['laps']);
+                    if ($v3) {
+                        $max = GameRules::stats($room, (int) $viewer->seat)['laps'] > 0 ? 3 : 2;
+                        $levels = ($tile['type'] ?? '') === 'property' ? range(0, $max) : [0];
+                        $purchaseOptions = array_map(fn (int $level) => ['level' => $level, 'price' => GameRules::propertyValue($tile, $level, $room->settings)], $levels);
+                    } else {
+                        $purchaseOptions = HousePurchase::options($tile, $room->settings, (int) GameRules::stats($room, (int) $viewer->seat)['laps']);
+                    }
                     break;
                 }
             }
@@ -330,16 +348,55 @@ class RoomService
                 'purchase_options' => $purchaseOptions,
                 'max_initial_level' => GameRules::maxInitialLevel($room->settings, (int) GameRules::stats($room, (int) $viewer->seat)['laps']),
             ];
+            if ($v3) {
+                $action = $pending['action'] ?? null;
+                $stats = GameRules::stats($room, (int) $viewer->seat);
+                $you = [...$you,
+                    'can_roll' => $isTurn && ! $pending && in_array($room->phase, ['PRE_ROLL', MatchStatus::WAITING_FOR_ACTION], true),
+                    'can_confirm_roll' => false, 'can_reroll' => false,
+                    'can_wait_island' => $isTurn && $action === 'island',
+                    'can_escape_island' => $isTurn && $action === 'island' && $viewer->cash >= (int) ($room->settings['island_fee'] ?? 200000),
+                    'can_choose_destination' => $isTurn && in_array($action, ['tour', 'championship', 'chance_target'], true),
+                    'can_takeover' => $isTurn && $action === 'buyout',
+                    'can_accept_winnings' => false,
+                    'can_buy' => $isTurn && $action === 'buy',
+                    'can_skip' => $isTurn && in_array($action, ['buy', 'build', 'buyout', 'championship', 'tour', 'discard_card'], true),
+                    'can_pay' => $isTurn && $action === 'debt' && $viewer->cash >= (int) ($pending['amount'] ?? PHP_INT_MAX),
+                    'can_draw' => $isTurn && $action === 'card',
+                    'can_upgrade' => $isTurn && $action === 'build',
+                    'can_end_turn' => false,
+                    'can_bankrupt' => $isTurn && $action === 'debt',
+                    'can_island_roll' => $isTurn && $action === 'island',
+                    'can_use_escape_card' => $isTurn && $action === 'island' && ! $stats['used_saved_card'] && in_array('island_escape', $stats['hand'], true),
+                    'can_use_shield' => $isTurn && ! $stats['used_saved_card'] && in_array('shield', $stats['hand'], true),
+                    'hand' => $stats['hand'],
+                    'targets' => $pending['targets'] ?? [],
+                    'upgrades' => $action === 'build' ? (function () use ($room, $pending): array {
+                        $property = $room->properties->firstWhere('tile_index', (int) $pending['tile']);
+                        $next = (int) (($property?->level ?? 0) + 1);
+                        $tile = collect($room->settings['tiles'])->firstWhere('index', (int) $pending['tile']);
+
+                        return [['tile' => (int) $pending['tile'], 'level' => $next, 'cost' => (int) ($next === 4 ? ($tile['hotel_price'] ?? 0) : ($tile['house_price'] ?? 0))]];
+                    })() : [],
+                    'max_initial_level' => $stats['laps'] > 0 ? 3 : 2,
+                ];
+            }
             if ($includeToken) {
                 $you['player_token'] = $viewer->player_token;
             }
         }
 
+        $tileDefinitions = array_column($room->settings['tiles'] ?? [], null, 'index');
         $properties = ($room->relationLoaded('properties') ? $room->properties : $room->properties()->get())
             ->map(fn (BoardProperty $p) => [
                 'tile_index' => $p->tile_index,
                 'owner_seat' => $p->owner_seat,
                 'level' => $p->level,
+                'rent' => $v3 ? GameRules::rentAmount($room, $tileDefinitions[$p->tile_index] ?? [], $p) : null,
+                'festival' => isset($room->state['festivals'][$p->tile_index]),
+                'shield' => (bool) ($room->state['shields'][$p->tile_index] ?? false),
+                'blackout' => isset($room->state['blackouts'][$p->tile_index]),
+                'championship_points' => (int) (($room->state['championship']['tile'] ?? -1) === $p->tile_index ? ($room->state['championship']['points'] ?? 0) : 0),
             ])->values();
 
         $ledger = LedgerEntry::query()
@@ -355,6 +412,16 @@ class RoomService
                 'amount' => $row->amount,
                 'tile_index' => $row->tile_index,
             ])->values();
+
+        $publicState = $room->state ?? [];
+        if ($v3) {
+            foreach (($publicState['player_stats'] ?? []) as $seat => $stats) {
+                if (! $viewer || (int) $seat !== (int) $viewer->seat) {
+                    $publicState['player_stats'][$seat]['hand_count'] = count($stats['hand'] ?? []);
+                    unset($publicState['player_stats'][$seat]['hand']);
+                }
+            }
+        }
 
         return [
             'room' => [
@@ -381,17 +448,19 @@ class RoomService
                 'min_players' => $room->settings['min_players'] ?? 2,
                 'max_players' => $room->settings['max_players'] ?? 4,
                 'winner_seat' => $room->state['winner_seat'] ?? null,
+                'winner_seats' => $room->state['winner_seats'] ?? (($room->state['winner_seat'] ?? null) === null ? [] : [$room->state['winner_seat']]),
                 'win_reason' => $room->state['win_reason'] ?? null,
                 'seconds_left' => $inMatch && $room->turn_deadline
                     ? max(0, $room->turn_deadline->getTimestamp() - now()->getTimestamp())
                     : null,
+                'match_deadline' => $room->state['match_deadline'] ?? null,
             ],
             'you' => $you,
             'players' => $players,
             'tiles' => $room->settings['tiles'] ?? [],
             'properties' => $properties,
             'ledger' => $ledger,
-            'state' => $room->state,
+            'state' => $publicState,
         ];
     }
 
