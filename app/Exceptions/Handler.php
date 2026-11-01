@@ -88,7 +88,13 @@ class Handler extends ExceptionHandler
             $status = $e->getStatusCode();
 
             return ApiResponse::error(
-                $status === 404 ? __('messages.not_found') : __('messages.server_error'),
+                match ($status) {
+                    404 => __('messages.not_found'),
+                    403 => __('auth.forbidden'),
+                    401 => __('auth.unauthorized'),
+                    422 => __('messages.validation_error'),
+                    default => __('messages.server_error'),
+                },
                 $status
             );
         }

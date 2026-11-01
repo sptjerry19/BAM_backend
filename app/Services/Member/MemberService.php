@@ -64,6 +64,7 @@ class MemberService
 
     public function attachEquipment(string $memberId, string $productId): Member
     {
+        abort_unless(auth('api')->user()?->member_id === (int) $memberId, 403);
         $member = Member::findOrFail($memberId);
         Product::findOrFail($productId);
 
@@ -79,6 +80,7 @@ class MemberService
 
     public function detachEquipment(string $memberId, string $productId): Member
     {
+        abort_unless(auth('api')->user()?->member_id === (int) $memberId, 403);
         $member = Member::findOrFail($memberId);
 
         $equipment = array_values(array_filter(

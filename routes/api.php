@@ -16,6 +16,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/social.php';
+
 Route::get('/', function () {
     return response()->json([
         'message' => 'Welcome to the API',
