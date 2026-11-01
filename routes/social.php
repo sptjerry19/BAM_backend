@@ -1,0 +1,85 @@
+<?php
+
+use App\Http\Controllers\Social\ChatController;
+use App\Http\Controllers\Social\LibraryController;
+use App\Http\Controllers\Social\MediaController;
+use App\Http\Controllers\Social\PostController;
+use App\Http\Controllers\Social\ProfileController;
+use App\Http\Controllers\Social\RelationshipController;
+use App\Http\Controllers\Social\StoryController;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(ThrottleRequests::class.':600,1')->group(function () {
+    Route::get('profiles/{user}', [ProfileController::class, 'show'])->whereNumber('user');
+    Route::get('member-profiles/{member}', [ProfileController::class, 'member'])->whereNumber('member');
+    Route::get('member-profiles/{member}/equipment', [ProfileController::class, 'memberEquipment']);
+    Route::get('profiles/{user}/equipment', [ProfileController::class, 'equipment']);
+    Route::get('profiles/{user}/posts', [PostController::class, 'index']);
+    Route::get('posts/{post}', [PostController::class, 'show'])->whereNumber('post');
+    Route::get('posts/{post}/comments', [PostController::class, 'comments']);
+    Route::get('profiles/{user}/people/{type}', [RelationshipController::class, 'people']);
+    Route::get('profiles/{user}/photos', [LibraryController::class, 'photos']);
+    Route::get('profiles/{user}/albums', [LibraryController::class, 'albums']);
+    Route::get('profiles/{user}/tagged', [LibraryController::class, 'tagged']);
+    Route::get('albums/{album}', [LibraryController::class, 'album']);
+    Route::get('profiles/{user}/stories', [StoryController::class, 'index']);
+    Route::get('profiles/{user}/highlights', [StoryController::class, 'highlights']);
+    Route::get('social-media/{media}', [MediaController::class, 'show'])->name('social.media');
+    Route::get('social-media/{media}/access', [MediaController::class, 'access']);
+
+    Route::middleware('auth:api')->group(function () {
+        Route::patch('me/profile', [ProfileController::class, 'update']);
+        Route::patch('me/privacy', [ProfileController::class, 'privacy']);
+        Route::post('social-media', [MediaController::class, 'store'])->middleware(ThrottleRequests::class.':20,1');
+        Route::post('social-media/{media}/retry', [MediaController::class, 'retry']);
+        Route::delete('me/profile-image/{purpose}', [MediaController::class, 'remove']);
+        Route::get('people', [RelationshipController::class, 'search']);
+        Route::post('profiles/{user}/relationship', [RelationshipController::class, 'act']);
+        Route::post('posts', [PostController::class, 'store']);
+        Route::patch('posts/{post}', [PostController::class, 'update']);
+        Route::delete('posts/{post}', [PostController::class, 'destroy']);
+        Route::put('posts/{post}/restore', [PostController::class, 'restore']);
+        Route::put('posts/{post}/pin', [PostController::class, 'pin']);
+        Route::delete('posts/{post}/pin', [PostController::class, 'unpin']);
+        Route::put('posts/{post}/reaction', [PostController::class, 'react']);
+        Route::delete('posts/{post}/reaction', [PostController::class, 'unreact']);
+        Route::put('posts/{post}/saved', [PostController::class, 'save']);
+        Route::delete('posts/{post}/saved', [PostController::class, 'unsave']);
+        Route::get('me/saved-posts', [PostController::class, 'saved']);
+        Route::post('posts/{post}/comments', [PostController::class, 'comment']);
+        Route::patch('comments/{comment}', [PostController::class, 'updateComment']);
+        Route::delete('comments/{comment}', [PostController::class, 'deleteComment']);
+        Route::get('me/activity', [LibraryController::class, 'activity']);
+        Route::post('posts/{post}/tags', [LibraryController::class, 'tag']);
+        Route::patch('tags/{tag}', [LibraryController::class, 'reviewTag']);
+        Route::post('social-media/{media}/tags', [LibraryController::class, 'photoTag']);
+        Route::patch('photo-tags/{tag}', [LibraryController::class, 'reviewPhotoTag']);
+        Route::post('albums', [LibraryController::class, 'storeAlbum']);
+        Route::patch('albums/{album}', [LibraryController::class, 'updateAlbum']);
+        Route::delete('albums/{album}', [LibraryController::class, 'deleteAlbum']);
+        Route::get('notifications', [RelationshipController::class, 'notifications']);
+        Route::get('me/social-counts', [RelationshipController::class, 'counts']);
+        Route::put('notifications/read', [RelationshipController::class, 'readAll']);
+        Route::put('notifications/{notification}/read', [RelationshipController::class, 'read']);
+        Route::post('reports', [RelationshipController::class, 'report']);
+        Route::post('stories', [StoryController::class, 'store']);
+        Route::put('stories/{story}/view', [StoryController::class, 'view']);
+        Route::put('stories/{story}/reaction', [StoryController::class, 'react']);
+        Route::get('stories/{story}/views', [StoryController::class, 'views']);
+        Route::delete('stories/{story}', [StoryController::class, 'destroy']);
+        Route::post('highlights', [StoryController::class, 'highlight']);
+        Route::patch('highlights/{highlight}', [StoryController::class, 'updateHighlight']);
+        Route::delete('highlights/{highlight}', [StoryController::class, 'deleteHighlight']);
+        Route::get('conversations', [ChatController::class, 'index']);
+        Route::post('conversations', [ChatController::class, 'store']);
+        Route::get('conversations/{conversation}/messages', [ChatController::class, 'messages']);
+        Route::post('conversations/{conversation}/messages', [ChatController::class, 'send']);
+        Route::put('conversations/{conversation}/accept', [ChatController::class, 'accept']);
+        Route::put('conversations/{conversation}/read', [ChatController::class, 'read']);
+        Route::middleware('admin')->group(function () {
+            Route::get('social-reports', [RelationshipController::class, 'reports']);
+            Route::patch('social-reports/{report}', [RelationshipController::class, 'review']);
+        });
+    });
+});

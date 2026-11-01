@@ -30,6 +30,14 @@ return [
 
     'disks' => [
 
+        // Never symlink this disk or grant a public bucket policy to social media.
+        'social_private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/social-private'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app'),

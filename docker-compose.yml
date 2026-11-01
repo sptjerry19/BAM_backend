@@ -82,6 +82,14 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
     networks:
       - jb_net
@@ -112,6 +120,7 @@ services:
         hard: -1
 
 volumes:
+  redis_data:
   mysql_data:
   es_data:
   backend_storage:

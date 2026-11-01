@@ -21,8 +21,8 @@ class StoreMemberEquipmentRequest extends FormRequest
             'brand' => 'nullable|string|max:255',
             'category' => 'required|in:racket,shoes,shirt,shorts,bag,grip,other,shuttlecock,string',
             'price' => 'nullable|integer|min:0',
-            'notes' => 'nullable|string',
-            'image' => 'nullable|string',
+            'notes' => 'nullable|string|max:2000',
+            'image' => 'nullable|string|max:7340032',
         ];
     }
 }

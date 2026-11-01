@@ -4,8 +4,9 @@ namespace App\Services\Ranking;
 
 use App\Models\Booking;
 use App\Models\Member;
+use App\Services\Social\PostService;
+use App\Services\Social\ProfileService;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 class RankingService
 {
@@ -48,7 +49,7 @@ class RankingService
                     'id' => (string) $member->id,
                     'rank' => $index + 1,
                     'name' => $member->name,
-                    'handle' => Str::before((string) $member->email, '@'),
+                    'handle' => 'member-'.$member->id,
                     'club' => 'JBadminton',
                     'level' => $member->level,
                     'points' => (int) $member->points,
@@ -127,26 +128,30 @@ class RankingService
         $matches = (int) $member->matches;
         $wins = (int) $member->wins;
         $photos = array_values(array_filter([(string) $member->avatar]));
+        $profile = app(ProfileService::class)->member((int) $member->id);
+        $posts = $profile['id'] ? app(PostService::class)->list($profile['id'], ['per_page' => 3])['data'] : [];
 
         return [
             'id' => (string) $member->id,
+            'profile_user_id' => $profile['id'],
             'rank' => $card['rank'] ?? null,
             'name' => $member->name,
-            'handle' => Str::before((string) $member->email, '@'),
-            'club' => 'JBadminton',
+            'handle' => 'member-'.$member->id,
+            'club' => $profile['club'] ?? 'JBadminton',
             'level' => $member->level,
             'points' => (int) $member->points,
             'win' => $wins,
             'loss' => max(0, $matches - $wins),
             'trend' => 'same',
             'avatar' => $member->avatar,
-            'cover' => $member->avatar,
+            'cover' => $profile['cover'] ?? null,
+            'bio' => $profile['bio'] ?? null,
             'since' => $member->join_date?->format('Y'),
-            'friends' => 0,
-            'followers' => 0,
-            'following' => 0,
+            'friends' => $profile['friend_count'] ?? null,
+            'followers' => $profile['follower_count'] ?? null,
+            'following' => $profile['following_count'] ?? null,
             'photos' => $photos,
-            'posts' => [],
+            'posts' => $posts,
             'achievements' => [],
         ];
     }

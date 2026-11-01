@@ -1,4 +1,7 @@
 vendor
+public/storage
+storage/framework/testing/*
+storage/app/social-private/*
 node_modules
 storage/logs/*
 storage/framework/cache/*

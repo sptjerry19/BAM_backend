@@ -4,29 +4,39 @@ namespace App\Services\Member;
 
 use App\Models\Member;
 use App\Models\MemberEquipment;
+use App\Services\Social\MediaService;
 use App\Services\Storage\FileUploadService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class MemberEquipmentService
 {
-    public function __construct(private readonly FileUploadService $uploads)
-    {
-    }
+    public function __construct(private readonly FileUploadService $uploads) {}
 
     /**
      * @return Collection<int, MemberEquipment>
      */
     public function listForMember(string $memberId): Collection|bool
     {
+        // Existing management endpoint is owner-only. Visitors use the filtered profile resource.
+        abort_unless(auth('api')->user()?->member_id === (int) $memberId, 403);
         try {
             Member::findOrFail($memberId);
 
-            return MemberEquipment::query()
+            $items = MemberEquipment::query()
                 ->where('member_id', $memberId)
                 ->orderByDesc('created_at')
                 ->get();
+            foreach ($items as $item) {
+                if ($item->image) {
+                    $item->image = app(MediaService::class)->equipmentResource($item->id, $item->image);
+                }
+            }
+
+            return $items;
         } catch (\Exception $e) {
             Log::error($e->getMessage());
 
@@ -36,10 +46,18 @@ class MemberEquipmentService
 
     public function create(string $memberId, array $data): MemberEquipment|bool
     {
+        abort_unless(auth('api')->user()?->member_id === (int) $memberId, 403);
+        $uploaded = null;
         try {
             Member::findOrFail($memberId);
 
-            $image = $this->resolveImageUrl($data['image'] ?? null);
+            $rawImage = $data['image'] ?? null;
+            if (is_string($rawImage) && (str_starts_with($rawImage, 'data:image/') || $this->looksLikeBase64($rawImage))) {
+                $uploaded = $this->uploads->uploadBase64($rawImage, 'equipment', 'social_private');
+                $image = null;
+            } else {
+                $image = $this->resolveImageUrl($rawImage);
+            }
 
             $data = [
                 'member_id' => $memberId,
@@ -51,9 +69,29 @@ class MemberEquipmentService
                 'image' => $image,
             ];
 
-            return MemberEquipment::create($data);
+            $equipment = DB::transaction(function () use ($data, $uploaded) {
+                $item = MemberEquipment::create($data);
+                if ($uploaded) {
+                    $id = (string) Str::uuid();
+                    DB::table('media_assets')->insert(['id' => $id, 'user_id' => auth('api')->id(), 'equipment_id' => $item->id,
+                        'purpose' => 'equipment', 'disk' => $uploaded['disk'], 'path' => $uploaded['path'], 'mime' => $uploaded['mime'],
+                        'size' => $uploaded['size'], 'created_at' => now(), 'updated_at' => now()]);
+                    $item->update(['image' => 'private:'.$id]);
+                }
+
+                return $item;
+            });
+            if ($equipment->image) {
+                $equipment->image = app(MediaService::class)->equipmentResource($equipment->id, $equipment->image);
+            }
+
+            return $equipment;
         } catch (\Exception $e) {
+            if ($uploaded) {
+                Storage::disk($uploaded['disk'])->delete($uploaded['path']);
+            }
             Log::error($e->getMessage());
+
             return false;
         }
     }
@@ -62,7 +100,12 @@ class MemberEquipmentService
     {
         $equipment = MemberEquipment::findOrFail($id);
 
-        if ($equipment->image) {
+        abort_unless(auth('api')->user()?->member_id === $equipment->member_id, 403);
+
+        $media = DB::table('media_assets')->where('equipment_id', $equipment->id)->first();
+        if ($media) {
+            Storage::disk($media->disk)->delete($media->path);
+        } elseif ($equipment->image) {
             $this->uploads->delete($equipment->image);
         }
 

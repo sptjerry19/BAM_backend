@@ -1,0 +1,22 @@
+# Merge last, after docker-compose.override.yml and docker-compose.social.yml.
+x-source: &source
+  - ./app:/var/www/html/app
+  - ./bootstrap:/var/www/html/bootstrap
+  - ./config:/var/www/html/config
+  - ./database:/var/www/html/database
+  - ./lang:/var/www/html/lang
+  - ./routes:/var/www/html/routes
+  - ./artisan:/var/www/html/artisan
+  - backend_vendor:/var/www/html/vendor
+  - backend_storage:/var/www/html/storage
+
+services:
+  reverb:
+    volumes: *source
+    ports: ["127.0.0.1:8081:8080"]
+  queue:
+    volumes: *source
+  scheduler:
+    volumes: *source
+  media-worker:
+    volumes: *source
