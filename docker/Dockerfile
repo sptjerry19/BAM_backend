@@ -1,7 +1,7 @@
 FROM php:8.4-fpm-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git unzip curl procps libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+    git unzip curl procps ffmpeg libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
     libicu-dev libonig-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY docker/php/social.ini /usr/local/etc/php/conf.d/social.ini
 
 WORKDIR /var/www/html
 
@@ -23,8 +24,7 @@ RUN composer dump-autoload --optimize --no-dev \
     && chmod -R ug+rwx storage bootstrap/cache
 
 COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && chown -R www-data:www-data /var/www/html
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["php-fpm", "-F"]

@@ -74,6 +74,10 @@ class Handler extends ExceptionHandler
             return ApiResponse::error(__('messages.not_found'), 404);
         }
 
+        if ($e instanceof CapitalRivalsException) {
+            return ApiResponse::error($e->getMessage(), $e->httpStatus, ['code' => $e->errorCode]);
+        }
+
         if ($e instanceof QueryException || $e instanceof PDOException) {
             report($e);
 
@@ -84,7 +88,13 @@ class Handler extends ExceptionHandler
             $status = $e->getStatusCode();
 
             return ApiResponse::error(
-                $status === 404 ? __('messages.not_found') : __('messages.server_error'),
+                match ($status) {
+                    404 => __('messages.not_found'),
+                    403 => __('auth.forbidden'),
+                    401 => __('auth.unauthorized'),
+                    422 => __('messages.validation_error'),
+                    default => __('messages.server_error'),
+                },
                 $status
             );
         }

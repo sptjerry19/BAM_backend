@@ -14,6 +14,12 @@ until php -r "try { new PDO('mysql:host=' . getenv('DB_HOST') . ';port=' . (gete
   sleep 1
 done
 
+# Auxiliary long-running processes must not mutate caches, run migrations,
+# or chown shared storage concurrently with the API startup.
+if [ "${SOCIAL_PROCESS:-false}" = "true" ]; then
+  exec "$@"
+fi
+
 mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs storage/app/public bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R ug+rwx storage bootstrap/cache

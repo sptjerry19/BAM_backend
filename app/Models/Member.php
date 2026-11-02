@@ -37,6 +37,20 @@ class Member extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function getAvatarAttribute(?string $value): ?string
+    {
+        // Older registrations included a private email in the public avatar URL.
+        $url = $value ? parse_url($value) : false;
+        if ($url && ($url['host'] ?? '') === 'i.pravatar.cc') {
+            parse_str($url['query'] ?? '', $query);
+            if (filter_var($query['u'] ?? '', FILTER_VALIDATE_EMAIL)) {
+                return 'https://i.pravatar.cc/150?u='.hash('sha256', 'member:'.$this->id.':'.config('app.key'));
+            }
+        }
+
+        return $value;
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);

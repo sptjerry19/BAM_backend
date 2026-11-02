@@ -13,9 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
-    public function __construct(private readonly FileUploadService $uploads)
-    {
-    }
+    public function __construct(private readonly FileUploadService $uploads) {}
+
     /**
      * @return array{access_token: string, token_type: string, expires_in: int, user: array}|null
      */
@@ -49,7 +48,7 @@ class AuthService
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
-            'avatar' => 'https://i.pravatar.cc/150?u=' . urlencode($data['email']),
+            'avatar' => 'https://i.pravatar.cc/150?u='.(string) Str::uuid(),
             'level' => 'beginner',
             'points' => 0,
             'matches' => 0,
@@ -95,23 +94,22 @@ class AuthService
             $user->password = $data['password'];
         }
 
-        $user->name = $data['name'];
-        $user->email = $data['email'];
-        $user->save();
-
-        $member = $user->member;
-        if ($member) {
-            $avatar = $data['avatar'] ?? $member->avatar;
-            if ($avatarFile) {
-                $avatar = $this->uploads->upload($avatarFile, 'avatars')['url'];
+        $uploaded = $avatarFile ? $this->uploads->upload($avatarFile, 'avatars') : null;
+        try {
+            DB::transaction(function () use ($user, $data, $uploaded) {
+                $user->name = $data['name'];
+                $user->email = $data['email'];
+                $user->save();
+                $user->member?->update([
+                    'name' => $data['name'], 'email' => $data['email'], 'phone' => $data['phone'] ?? null,
+                    'avatar' => $uploaded['url'] ?? $data['avatar'] ?? $user->member->avatar,
+                ]);
+            });
+        } catch (\Throwable $e) {
+            if ($uploaded) {
+                $this->uploads->delete($uploaded['path'], $uploaded['disk']);
             }
-
-            $member->update([
-                'name' => $data['name'],
-                'email' => $data['email'],
-                'phone' => $data['phone'] ?? null,
-                'avatar' => $avatar,
-            ]);
+            throw $e;
         }
 
         return $user->fresh()->toAuthArray();

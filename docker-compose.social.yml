@@ -1,0 +1,87 @@
+# Merge after the base compose (and local override, when developing).
+# docker compose -f docker-compose.yml -f docker-compose.social.yml up -d --build
+x-social: &social
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  env_file: .env
+  environment: &social-env
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_DATABASE: ${DB_DATABASE:-jbam}
+    DB_USERNAME: jbam
+    DB_PASSWORD: ${DB_PASSWORD:-secret}
+    REDIS_HOST: redis
+    BROADCAST_CONNECTION: reverb
+    QUEUE_CONNECTION: redis
+    CACHE_STORE: redis
+    CACHE_DRIVER: redis
+    REVERB_HOST: reverb
+    REVERB_PORT: 8080
+    REVERB_SCHEME: http
+    LOG_CHANNEL: stderr
+    SKIP_ENTRYPOINT_MIGRATE: "true"
+    RUN_SCOUT_IMPORT: "false"
+    SOCIAL_PROCESS: "true"
+  volumes:
+    - backend_storage:/var/www/html/storage
+  depends_on:
+    backend:
+      condition: service_healthy
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  stop_grace_period: 75s
+  networks: [jb_net]
+
+services:
+  backend:
+    healthcheck:
+      test: ["CMD", "php", "artisan", "social:health"]
+      interval: 10s
+      timeout: 8s
+      retries: 20
+      start_period: 30s
+    environment:
+      BROADCAST_CONNECTION: reverb
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      CACHE_DRIVER: redis
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+  reverb:
+    <<: *social
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 8080) ? 0 : 1);"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
+  queue:
+    <<: *social
+    command: ["php", "artisan", "queue:work", "redis", "--queue=broadcasts,default", "--sleep=1", "--tries=3", "--timeout=60", "--max-time=3600"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '^php artisan queue:work' >/dev/null"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+  scheduler:
+    <<: *social
+    command: ["php", "artisan", "schedule:work"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '^php artisan schedule:work' >/dev/null"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+  media-worker:
+    <<: *social
+    command: ["php", "artisan", "queue:work", "redis", "--queue=media", "--sleep=1", "--tries=1", "--timeout=600", "--max-time=3600"]
+    stop_grace_period: 620s
