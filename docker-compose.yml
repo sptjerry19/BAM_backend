@@ -119,11 +119,27 @@ services:
         soft: -1
         hard: -1
 
+  # Path-style S3. Public URL is /s3/{bucket}/<key> via the landing nginx proxy.
+  minio:
+    image: pgsty/silo:RELEASE.2026-10-26T00-00-00Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      jb_net:
+        aliases:
+          - minio
+
 volumes:
   redis_data:
   mysql_data:
   es_data:
   backend_storage:
+  minio_data:
 
 networks:
   jb_net:
