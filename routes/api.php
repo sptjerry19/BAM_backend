@@ -17,6 +17,7 @@ use App\Http\Controllers\CategoryController;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/social.php';
+require __DIR__.'/content-studio.php';
 
 Route::get('/', function () {
     return response()->json([

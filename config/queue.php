@@ -71,6 +71,18 @@ return [
             'after_commit' => false,
         ],
 
+        // Same Redis, longer retry_after: Content Studio media jobs (video) may run
+        // up to 30 minutes. With the 660s above Redis would hand the job to a second
+        // worker while the first is still rendering. Must stay > worker --timeout.
+        'redis-media' => [
+            'driver' => 'redis',
+            'connection' => 'default',
+            'queue' => 'content-media',
+            'retry_after' => (int) env('REDIS_MEDIA_QUEUE_RETRY_AFTER', 2000),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
     ],
 
     /*

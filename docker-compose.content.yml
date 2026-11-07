@@ -1,0 +1,77 @@
+# JBAM AI Content Studio (overlay - merge AFTER the files the stack already runs with).
+#
+# The live stack is started with four files, so use ALL of them plus this one:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml \
+#     -f docker-compose.social.yml -f docker-compose.social.local.yml \
+#     -f docker-compose.content.yml \
+#     up -d --build --no-deps --no-recreate content-scheduler content-queue
+#
+# Do NOT run it with only `-f docker-compose.yml -f docker-compose.content.yml`:
+# compose would recompute `backend`/`api` without the override + social files and
+# recreate them with the wrong configuration. `--no-deps --no-recreate` + the two
+# service names make sure nothing that is already running is touched.
+#
+# These containers do not bind-mount the source (unlike the legacy ones): they run
+# the code baked into the image. After changing code, rebuild them (drop --no-recreate).
+#
+# Independent of docker-compose.social*.yml: nothing in those files is modified.
+#
+# Phase 1 ships scheduler + queue. The `content-media` container (Python,
+# Playwright, FFmpeg, Whisper) arrives with the carousel renderer in Phase 2.
+x-content: &content
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  env_file: .env
+  environment: &content-env
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_DATABASE: ${DB_DATABASE:-jbam}
+    DB_USERNAME: jbam
+    DB_PASSWORD: ${DB_PASSWORD:-secret}
+    REDIS_HOST: redis
+    QUEUE_CONNECTION: redis
+    CACHE_STORE: redis
+    CACHE_DRIVER: redis
+    LOG_CHANNEL: stderr
+    SKIP_ENTRYPOINT_MIGRATE: "true"
+    # Makes docker-entrypoint.sh skip migrate/chown and exec the command directly.
+    SOCIAL_PROCESS: "true"
+    CONTENT_STUDIO_ENABLED: ${CONTENT_STUDIO_ENABLED:-false}
+  volumes:
+    - backend_storage:/var/www/html/storage
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  stop_grace_period: 200s
+  networks: [jb_net]
+
+services:
+  content-scheduler:
+    <<: *content
+    environment:
+      <<: *content-env
+      # Only content:* — does NOT start the social:* schedule.
+      CONTENT_SCHEDULE_SCOPE: content
+    # Recover first (laptop was off / restarted), then run the scheduler forever.
+    command: ["sh", "-c", "php artisan content:recover --boot; exec php artisan schedule:work"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '^php artisan schedule:work' >/dev/null"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  content-queue:
+    <<: *content
+    # --timeout must stay well below redis retry_after (660s).
+    command: ["php", "artisan", "queue:work", "redis", "--queue=content", "--sleep=3",
+              "--tries=3", "--timeout=180", "--max-time=3600"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '^php artisan queue:work' >/dev/null"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
