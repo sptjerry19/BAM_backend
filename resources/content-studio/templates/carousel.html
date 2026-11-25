@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  Fixed carousel template. It is loaded from a string by content-media/render_carousel.py and
+  filled ONLY through textContent: slide text can never become markup or script.
+  The browser has no network access; fonts arrive as data: URLs.
+-->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; }
+  #slide { position: relative; width: 1080px; height: 1920px; overflow: hidden; font-family: 'BVP', sans-serif; color: #fff; }
+  header { position: absolute; left: 90px; right: 140px; top: 130px; display: flex; justify-content: space-between; align-items: baseline; }
+  #brand { font-weight: 700; font-size: 30px; }
+  #label { margin-left: 28px; font-weight: 700; font-size: 26px; color: var(--accent); }
+  #counter { font-size: 28px; color: #B9C4D8; }
+  main { position: absolute; left: 90px; right: 140px; top: 300px; height: 1080px; display: flex; flex-direction: column; justify-content: center; }
+  .bar { width: 96px; height: 8px; background: var(--accent); margin-bottom: 28px; flex: none; }
+  h1 { margin: 0; font-weight: 700; line-height: 1.38; overflow-wrap: anywhere; }
+  p { margin: 34px 0 0; color: #E4E9F2; line-height: 1.5; overflow-wrap: anywhere; }
+  p:empty { display: none; }
+  footer { position: absolute; left: 90px; right: 140px; top: 1440px; font-size: 28px; color: #B9C4D8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div id="slide">
+  <header><div><span id="brand"></span><span id="label"></span></div><div id="counter"></div></header>
+  <main><div class="bar"></div><h1 id="heading"></h1><p id="body"></p></main>
+  <footer id="footer"></footer>
+</div>
+<script>
+  // d = { width, height, theme: {from,to,accent}, brand, slot_label, footer, slide: {kind, heading, body, index, total}, fonts: [[b64, weight], ...] }
+  window.renderSlide = async function (d) {
+    const slide = document.getElementById('slide');
+    slide.style.width = d.width + 'px';
+    slide.style.height = d.height + 'px';
+    slide.style.background = 'linear-gradient(180deg, ' + d.theme.from + ', ' + d.theme.to + ')';
+    slide.style.setProperty('--accent', d.theme.accent);
+
+    for (const [b64, weight] of d.fonts) {
+      const face = new FontFace('BVP', 'url(data:font/ttf;base64,' + b64 + ')', { weight: String(weight) });
+      document.fonts.add(await face.load());
+    }
+
+    document.getElementById('brand').textContent = d.brand;
+    document.getElementById('label').textContent = d.slot_label;
+    document.getElementById('counter').textContent = d.slide.index + '/' + d.slide.total;
+    document.getElementById('heading').textContent = d.slide.heading;
+    document.getElementById('body').textContent = d.slide.body;
+    document.getElementById('footer').textContent = d.footer;
+
+    const hook = d.slide.kind === 'hook';
+    const headingStart = hook ? 86 : 66, bodyStart = hook ? 50 : 46;
+    const main = document.querySelector('main');
+    const heading = document.getElementById('heading');
+    const body = document.getElementById('body');
+    const fits = () => main.scrollHeight <= main.clientHeight;
+
+    for (let k = 1.0; k >= 0.55; k -= 0.03) {
+      heading.style.fontSize = Math.round(headingStart * k) + 'px';
+      body.style.fontSize = Math.round(bodyStart * k) + 'px';
+      if (fits()) break;
+    }
+    await document.fonts.ready;
+
+    return { fits: fits() };
+  };
+</script>
+</body>
+</html>

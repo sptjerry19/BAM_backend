@@ -49,6 +49,11 @@ class ContentItem extends Model
             ->withPivot('usage')->withTimestamps();
     }
 
+    public function products(): HasMany
+    {
+        return $this->hasMany(ContentItemProduct::class, 'content_item_id');
+    }
+
     public function assets(): HasMany
     {
         return $this->hasMany(ContentAsset::class, 'content_item_id');

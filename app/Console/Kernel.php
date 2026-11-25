@@ -37,13 +37,19 @@ class Kernel extends ConsoleKernel
 
     private function scheduleContentStudio(Schedule $schedule): void
     {
-        // Only jobs that exist in this phase. Plan / discover / publish / report
-        // are added together with their commands in later phases.
+        // Only commands that exist. Publish / sync / report arrive with their phase.
         //
         // onOneServer(): the legacy `scheduler` container (scope `all`) and the
         // `content-scheduler` container share the same .env, so both register these
         // entries once the feature flag is on. The Redis lock makes each tick run once.
         $schedule->command('content:recover')->everyFifteenMinutes()->withoutOverlapping(10)->onOneServer();
+
+        // Discovery first, so the plan sees today's sources. Both in Asia/Ho_Chi_Minh.
+        $tz = (string) config('content-studio.timezone');
+        $schedule->command('content:discover')->dailyAt('05:50')->timezone($tz)->withoutOverlapping(30)->onOneServer();
+        // Planning costs money: only scheduled when AI is explicitly enabled and a key exists.
+        $schedule->command('content:plan --days-ahead=1')->dailyAt('06:00')->timezone($tz)->withoutOverlapping(60)->onOneServer()
+            ->when(fn () => (bool) config('content-studio.ai.enabled') && (string) config('services.openai.key') !== '');
     }
 
     /**

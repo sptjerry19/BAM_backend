@@ -1,0 +1,3 @@
+# Chromium for carousel rendering. Version range, not a pin: the browser build is
+# downloaded by `playwright install` and must match the library.
+playwright>=1.49,<2

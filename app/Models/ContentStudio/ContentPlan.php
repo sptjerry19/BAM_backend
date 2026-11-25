@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ContentPlan extends Model
 {
-    protected $fillable = ['channel_id', 'plan_date', 'status', 'strategy_version', 'generated_at'];
+    protected $fillable = ['channel_id', 'plan_date', 'status', 'strategy_version', 'generated_at', 'shortfalls_json', 'prompt_version'];
 
     protected $casts = [
         'plan_date' => 'date',
         'generated_at' => 'datetime',
+        'shortfalls_json' => 'array',
     ];
 
     public function channel(): BelongsTo

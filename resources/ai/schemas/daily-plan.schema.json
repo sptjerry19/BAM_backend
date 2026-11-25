@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["date", "items", "skipped_slots"],
+  "properties": {
+    "date": { "type": "string" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot", "format", "title", "hook", "caption", "hashtags", "source_ids", "product_ids",
+          "viewer_question", "demand_basis", "slides", "review_reason"
+        ],
+        "properties": {
+          "slot": { "type": "string", "enum": ["news", "equipment", "tutorial", "meme"] },
+          "format": { "type": "string", "enum": ["carousel"] },
+          "title": { "type": "string" },
+          "hook": { "type": "string" },
+          "caption": { "type": "string" },
+          "hashtags": { "type": "array", "items": { "type": "string" } },
+          "source_ids": { "type": "array", "items": { "type": "string" } },
+          "product_ids": { "type": "array", "items": { "type": "string" } },
+          "viewer_question": { "type": "string" },
+          "demand_basis": { "type": "string", "enum": ["verified_trend", "hypothesis", "evergreen"] },
+          "slides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["heading", "body"],
+              "properties": {
+                "heading": { "type": "string" },
+                "body": { "type": "string" }
+              }
+            }
+          },
+          "review_reason": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "skipped_slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slot", "reason"],
+        "properties": {
+          "slot": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

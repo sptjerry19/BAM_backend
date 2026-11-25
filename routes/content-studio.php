@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ContentStudio\AutomationController;
+use App\Http\Controllers\Api\ContentStudio\CalendarController;
 use App\Http\Controllers\Api\ContentStudio\ContentItemController;
 use App\Http\Controllers\Api\ContentStudio\OverviewController;
 use App\Http\Controllers\Api\ContentStudio\PipelineRunController;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\Route;
 */
 Route::middleware(['auth:api', 'admin'])->prefix('admin/content-studio')->group(function () {
     Route::get('overview', OverviewController::class);
+
+    Route::get('calendar', CalendarController::class);
 
     Route::get('contents', [ContentItemController::class, 'index']);
     Route::get('contents/{item}', [ContentItemController::class, 'show'])->whereNumber('item');

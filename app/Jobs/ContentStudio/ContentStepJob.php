@@ -52,12 +52,12 @@ abstract class ContentStepJob implements ShouldQueue
      *
      * @param  Closure(\App\Models\ContentStudio\ContentPipelineStep): (array<string, mixed>|null)  $work
      */
-    protected function execute(StepRunner $runner, ContentPipelineRun $run, string $stepName, Closure $work): StepOutcome
+    protected function execute(StepRunner $runner, ContentPipelineRun $run, string $stepName, Closure $work, ?array $input = null): StepOutcome
     {
         $lease = $this->timeout + (int) config('content-studio.steps.lease_grace_seconds');
 
         try {
-            $outcome = $runner->run($run, $stepName, $work, leaseSeconds: $lease, maxAttempts: $this->tries);
+            $outcome = $runner->run($run, $stepName, $work, input: $input, leaseSeconds: $lease, maxAttempts: $this->tries);
         } catch (NonRetryableStepException $e) {
             $this->fail($e); // do not burn the remaining tries
 

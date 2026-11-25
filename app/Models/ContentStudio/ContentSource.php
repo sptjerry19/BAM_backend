@@ -11,7 +11,7 @@ class ContentSource extends Model
     // `rights_status` is not fillable: it changes only through an explicit,
     // audited action (admin API / RightsGate), never by mass assignment.
     protected $fillable = [
-        'platform', 'bucket', 'external_id', 'canonical_url', 'url_hash', 'creator',
+        'platform', 'bucket', 'external_id', 'canonical_url', 'url_hash', 'creator', 'title', 'summary', 'trust',
         'published_at', 'observed_at', 'downloaded_at', 'media_type', 'download_status',
         'download_basis', 'license_type', 'license_evidence_json', 'trend_evidence_json',
         'original_caption', 'proposed_caption', 'caption_status',

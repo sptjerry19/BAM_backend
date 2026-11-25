@@ -17,8 +17,9 @@
 #
 # Independent of docker-compose.social*.yml: nothing in those files is modified.
 #
-# Phase 1 ships scheduler + queue. The `content-media` container (Python,
-# Playwright, FFmpeg, Whisper) arrives with the carousel renderer in Phase 2.
+# Services: content-scheduler, content-queue (always), content-media (optional).
+# `content-media` (Python + Chromium, ~3GB image) is only needed for CONTENT_RENDER_DRIVER=playwright.
+# The default driver `gd` renders inside content-queue and needs no extra container.
 x-content: &content
   build:
     context: .
@@ -70,6 +71,30 @@ services:
     # --timeout must stay well below redis retry_after (660s).
     command: ["php", "artisan", "queue:work", "redis", "--queue=content", "--sleep=3",
               "--tries=3", "--timeout=180", "--max-time=3600"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '^php artisan queue:work' >/dev/null"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # OPTIONAL. Start it only together with CONTENT_RENDER_DRIVER=playwright in .env:
+  #   ... up -d --build --no-deps --no-recreate content-media
+  # (the dispatching side reads the same .env, so carousel jobs then go to the media queue).
+  content-media:
+    <<: *content
+    build:
+      context: .
+      dockerfile: docker/content-media/Dockerfile
+    environment:
+      <<: *content-env
+      CONTENT_RENDER_DRIVER: playwright
+    # --timeout < REDIS_MEDIA_QUEUE_RETRY_AFTER (2000s), otherwise Redis hands the job to a second worker
+    command: ["php", "artisan", "queue:work", "redis-media", "--queue=content-media", "--sleep=3",
+              "--tries=3", "--timeout=900", "--max-time=7200"]
+    stop_grace_period: 930s
+    cpus: "${CONTENT_MEDIA_CPUS:-4}"
+    mem_limit: ${CONTENT_MEDIA_MEM:-4g}
+    shm_size: 1g          # Chromium needs a real /dev/shm
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f '^php artisan queue:work' >/dev/null"]
       interval: 30s
