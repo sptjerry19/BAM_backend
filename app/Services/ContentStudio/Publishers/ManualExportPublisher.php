@@ -113,6 +113,9 @@ final class ManualExportPublisher
                 'media_paths' => array_values(array_filter($files, fn ($f) => str_ends_with($f, '.png'))),
                 'source_urls' => $sources->pluck('canonical_url')->all(),
                 'related_source_ids' => $sources->pluck('id')->all(),
+                // manufacturer pages the racket specs were read from: check them before posting
+                'spec_source_urls' => $item->products()->get()
+                    ->map(fn ($p) => $p->facts_snapshot_json['spec_source_url'] ?? null)->filter()->values()->all(),
             ],
             'trend_classification' => $item->brief_json['demand_basis'] ?? 'hypothesis',
             'trend_evidence' => null,

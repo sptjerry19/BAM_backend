@@ -190,8 +190,9 @@ return [
     | Equipment
     |--------------------------------------------------------------------------
     | products.price / stock come from a retailer import and age quickly: a price is
-    | shown only when it is younger than price_max_age_days. Specs are only ever
-    | taken from the product's own data; the planner may not invent any.
+    | shown only when it is younger than price_max_age_days. Specs come only from the
+    | product's own data or the manufacturer page linked to it (SpecMatcher, only
+    | unambiguous name matches); the planner may not invent any.
     */
     /*
     |--------------------------------------------------------------------------

@@ -181,7 +181,7 @@ final class ContentPlanner
                         'content_item_id' => $item->id,
                         'product_id' => $row['product_id'],
                         'role' => 'subject',
-                        'facts_snapshot_json' => ['facts' => $row['facts'], 'source_url' => $row['source_url'] ?? null, 'name' => $row['name'], 'brand' => $row['brand']],
+                        'facts_snapshot_json' => ['facts' => $row['facts'], 'source_url' => $row['source_url'] ?? null, 'spec_source_url' => $row['spec_source_url'] ?? null, 'name' => $row['name'], 'brand' => $row['brand']],
                         'price_snapshot_json' => $row['price'],
                     ]);
                 }
