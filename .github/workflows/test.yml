@@ -7,7 +7,15 @@ on:
       - 'tests/**'
       - 'routes/**'
       - 'config/capital_rivals.php'
+      - 'config/content-studio.php'
+      - 'config/services.php'
       - 'database/migrations/*capital_rivals*'
+      - 'database/migrations/*content_studio*'
+      - 'database/migrations/*racket_specs*'
+      - 'resources/ai/**'
+      - 'resources/content-studio/**'
+      - 'resources/fonts/**'
+      - 'content-media/**'
       - 'composer.json'
       - 'composer.lock'
       - 'phpunit.xml'
@@ -18,7 +26,15 @@ on:
       - 'tests/**'
       - 'routes/**'
       - 'config/capital_rivals.php'
+      - 'config/content-studio.php'
+      - 'config/services.php'
       - 'database/migrations/*capital_rivals*'
+      - 'database/migrations/*content_studio*'
+      - 'database/migrations/*racket_specs*'
+      - 'resources/ai/**'
+      - 'resources/content-studio/**'
+      - 'resources/fonts/**'
+      - 'content-media/**'
       - 'composer.json'
       - 'composer.lock'
       - 'phpunit.xml'
@@ -64,7 +80,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pdo_mysql, pdo_sqlite, redis
+          extensions: pdo_mysql, pdo_sqlite, redis, gd
           coverage: none
       - name: Prepare test environment
         run: cp .env.example .env
@@ -74,3 +90,6 @@ jobs:
         run: php artisan migrate --force --no-interaction
       - name: PHPUnit Capital Rivals
         run: php artisan test --filter=CapitalRivals
+      # Runs on in-memory SQLite (tests/Concerns/UsesContentStudioDatabase), not the MySQL service.
+      - name: PHPUnit Content Studio
+        run: vendor/bin/phpunit tests/Unit/ContentStudio tests/Feature/ContentStudio
