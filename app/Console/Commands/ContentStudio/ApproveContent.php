@@ -3,14 +3,9 @@
 namespace App\Console\Commands\ContentStudio;
 
 use App\Console\Commands\ContentStudio\Concerns\FindsContentItem;
-use App\Enums\ContentStudio\ContentStatus;
-use App\Services\ContentStudio\Ops\ContentEventLogger;
-use App\Services\ContentStudio\Publishers\ManualExportPublisher;
-use App\Services\ContentStudio\Quality\QualityGate;
-use App\Services\ContentStudio\Render\CarouselProducer;
-use App\Services\ContentStudio\State\ContentStateMachine;
+use App\Services\ContentStudio\Review\ContentReview;
+use App\Services\ContentStudio\Review\ReviewException;
 use Illuminate\Console\Command;
-use RuntimeException;
 
 class ApproveContent extends Command
 {
@@ -20,58 +15,37 @@ class ApproveContent extends Command
 
     protected $description = 'Approve an item that is waiting for review: moves it to ready and writes its export package';
 
-    public function handle(QualityGate $gate, CarouselProducer $producer, ContentStateMachine $states, ManualExportPublisher $exporter, ContentEventLogger $events): int
+    public function handle(ContentReview $review): int
     {
         if (($item = $this->contentItem()) === null) {
             return self::FAILURE;
         }
 
-        if ($item->status !== ContentStatus::NeedsReview) {
-            $this->error("Only an item in needs_review can be approved (item {$item->id} is {$item->status->value}).");
+        try {
+            $report = $review->assertApprovable($item);
 
-            return self::FAILURE;
-        }
-        if (! empty($item->brief_json['mock'])) {
-            $this->error('This item was produced by the MOCK AI client. Placeholder content is never approvable.');
+            $this->line('Review findings you are accepting:');
+            foreach ($report->failed() as $c) {
+                $this->warn("  - {$c['code']}: {$c['message']}");
+            }
 
-            return self::FAILURE;
-        }
-        if ($producer->readManifest($item, $producer->currentVersion($item)) === null) {
-            $this->error('The item has no complete render. Run content:render first.');
+            $result = $review->approve($item, (string) $this->option('reason'), 'cli', array_column($report->failed(), 'code'));
+        } catch (ReviewException $e) {
+            if ($e->reasonCode === ReviewException::REASON_REQUIRED) {
+                $this->error('Findings exist, so --reason="..." is required: say why they are acceptable.');
 
-            return self::FAILURE;
-        }
-
-        $report = $gate->evaluate($item);
-        $blocking = array_filter($report->failed(), fn ($c) => $c['severity'] === 'block');
-        if ($blocking !== []) {
-            $this->error('Cannot approve: these problems cannot be waived by a reviewer:');
-            foreach ($blocking as $c) {
+                return self::FAILURE;
+            }
+            $this->error($e->getMessage());
+            foreach ($e->findings as $c) {
                 $this->line("  - {$c['code']}: {$c['message']}");
             }
 
             return self::FAILURE;
         }
 
-        $this->line('Review findings you are accepting:');
-        foreach ($report->failed() as $c) {
-            $this->warn("  - {$c['code']}: {$c['message']}");
-        }
-
-        $reason = trim((string) $this->option('reason'));
-        if ($report->failed() !== [] && $reason === '') {
-            $this->error('Findings exist, so --reason="..." is required: say why they are acceptable.');
-
-            return self::FAILURE;
-        }
-
-        $states->transition($item, ContentStatus::Ready, null, 'cli');
-        $events->log('content.approved', 'content_item', $item->id, ['reason' => $reason, 'accepted' => array_column($report->failed(), 'code')], 'cli');
-
-        try {
-            $result = $exporter->export($item->refresh());
-        } catch (RuntimeException $e) {
-            $this->error('Approved, but the export failed: '.$e->getMessage());
+        if ($result['export_error'] !== null) {
+            $this->error('Approved, but the export failed: '.$result['export_error']);
 
             return self::FAILURE;
         }

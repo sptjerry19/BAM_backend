@@ -5,13 +5,14 @@ use App\Http\Controllers\Api\ContentStudio\CalendarController;
 use App\Http\Controllers\Api\ContentStudio\ContentItemController;
 use App\Http\Controllers\Api\ContentStudio\OverviewController;
 use App\Http\Controllers\Api\ContentStudio\PipelineRunController;
+use App\Http\Controllers\Api\ContentStudio\ReviewController;
 use App\Http\Controllers\Api\ContentStudio\SettingsController;
 use App\Http\Controllers\Api\ContentStudio\SourceController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| JBAM AI Content Studio — admin API (read-only, plus pause/resume)
+| JBAM AI Content Studio — admin API (reading, review decisions, pause/resume)
 |--------------------------------------------------------------------------
 | Loaded from routes/api.php, so the `api` prefix and middleware group apply.
 | Admin only. The endpoints stay reachable while CONTENT_STUDIO_ENABLED=false
@@ -24,6 +25,13 @@ Route::middleware(['auth:api', 'admin'])->prefix('admin/content-studio')->group(
 
     Route::get('contents', [ContentItemController::class, 'index']);
     Route::get('contents/{item}', [ContentItemController::class, 'show'])->whereNumber('item');
+
+    // review screen and the decisions a person can take; none of them posts anything
+    Route::get('contents/{item}/review', [ReviewController::class, 'show'])->whereNumber('item');
+    Route::get('contents/{item}/slides/{index}', [ReviewController::class, 'slide'])->whereNumber(['item', 'index']);
+    Route::post('contents/{item}/approve', [ReviewController::class, 'approve'])->whereNumber('item');
+    Route::post('contents/{item}/retry', [ReviewController::class, 'retry'])->whereNumber('item');
+    Route::post('contents/{item}/cancel', [ReviewController::class, 'cancel'])->whereNumber('item');
 
     Route::get('sources', [SourceController::class, 'index']);
 
