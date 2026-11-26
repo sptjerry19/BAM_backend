@@ -17,18 +17,15 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'member_id' => 'nullable|string|exists:members,id',
             'customer_name' => 'required|string|max:120',
             'customer_phone' => 'required|string|max:32',
             'customer_email' => 'required|email|max:255',
             'shipping_address' => 'required|string|max:500',
             'note' => 'nullable|string|max:1000',
             'payment_method' => 'required|in:cod,bank,apple_pay,momo',
-            'status' => 'nullable|in:pending,paid,shipped',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|string|exists:products,id',
             'items.*.qty' => 'required|integer|min:1',
-            'items.*.price' => 'nullable|integer|min:0',
         ];
     }
 

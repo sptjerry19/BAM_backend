@@ -2,13 +2,17 @@
 
 namespace App\Services\Auth;
 
+use App\Mail\PasswordResetCode;
 use App\Models\Member;
 use App\Models\User;
 use App\Services\Storage\FileUploadService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Illuminate\Validation\ValidationException;
 
 class AuthService
@@ -132,31 +136,62 @@ class AuthService
         return $this->tokenPayload($token, $user);
     }
 
-    /**
-     * @return array{email: string, reset_token: string}|null
-     */
-    public function forgotPassword(string $email): ?array
+    public function forgotPassword(string $email): void
     {
+        if (app()->environment('production') && in_array(config('mail.default'), ['log', 'array'], true)) {
+            throw new RuntimeException('Password reset requires a real mail transport.');
+        }
+
         $user = User::query()->where('email', $email)->first();
 
         if (! $user) {
-            return null;
+            return;
         }
 
-        $plainToken = Str::random(48);
+        $plainToken = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email' => $user->email],
             [
-                'token' => Hash::make($plainToken),
+                'token' => Hash::make('otp:'.$plainToken),
                 'created_at' => now(),
             ]
         );
 
-        return [
-            'email' => $user->email,
-            'reset_token' => $plainToken,
-        ];
+        Mail::to($user->email)->send(new PasswordResetCode($plainToken));
+    }
+
+    /** Exchange a valid one-time code for a short-lived reset grant. */
+    public function verifyResetCode(array $data): ?string
+    {
+        $key = 'reset-code:'.hash('sha256', strtolower($data['email']));
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            return null;
+        }
+
+        $grant = DB::transaction(function () use ($data) {
+            $row = DB::table('password_reset_tokens')->where('email', $data['email'])->lockForUpdate()->first();
+            if (! $row || ! $row->created_at || now()->diffInMinutes($row->created_at, true) > 10
+                || ! Hash::check('otp:'.$data['code'], $row->token)) {
+                return null;
+            }
+
+            $grant = Str::random(64);
+            DB::table('password_reset_tokens')->where('email', $data['email'])->update([
+                'token' => Hash::make('grant:'.$grant),
+                'created_at' => now(),
+            ]);
+
+            return $grant;
+        });
+
+        if ($grant === null) {
+            RateLimiter::hit($key, 3600);
+        } else {
+            RateLimiter::clear($key);
+        }
+
+        return $grant;
     }
 
     /**
@@ -164,27 +199,28 @@ class AuthService
      */
     public function resetPassword(array $data): bool|string
     {
-        $row = DB::table('password_reset_tokens')
-            ->where('email', $data['email'])
-            ->first();
+        return DB::transaction(function () use ($data) {
+            $row = DB::table('password_reset_tokens')
+                ->where('email', $data['email'])->lockForUpdate()->first();
 
-        if (! $row || ! Hash::check($data['token'], $row->token)) {
-            return 'reset_invalid';
-        }
+            if (! $row || ! Hash::check('grant:'.$data['token'], $row->token)) {
+                return 'reset_invalid';
+            }
 
-        if ($row->created_at && now()->diffInMinutes($row->created_at, true) > 60) {
+            if (! $row->created_at || now()->diffInMinutes($row->created_at, true) > 10) {
+                DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
+
+                return 'reset_expired';
+            }
+
+            $user = User::query()->where('email', $data['email'])->firstOrFail();
+            $user->password = $data['password'];
+            $user->save();
+
             DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
 
-            return 'reset_expired';
-        }
-
-        $user = User::query()->where('email', $data['email'])->firstOrFail();
-        $user->password = $data['password'];
-        $user->save();
-
-        DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
-
-        return true;
+            return true;
+        });
     }
 
     /**

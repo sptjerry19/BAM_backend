@@ -1,4 +1,4 @@
-name: Capital Rivals tests
+name: Backend tests
 
 on:
   push:
@@ -72,5 +72,5 @@ jobs:
         run: composer install --no-interaction --prefer-dist
       - name: Migrate
         run: php artisan migrate --force --no-interaction
-      - name: PHPUnit Capital Rivals
-        run: php artisan test --filter=CapitalRivals
+      - name: PHPUnit
+        run: php artisan test

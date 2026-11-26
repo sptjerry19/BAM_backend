@@ -1,0 +1,94 @@
+# Isolated local stack for this workspace. Never joins the server's jb_net.
+services:
+  dev-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: jbam_workspace
+      MYSQL_USER: jbam_workspace
+      MYSQL_PASSWORD: ${WORKSPACE_DB_PASSWORD:-workspace_dev_only}
+      MYSQL_ROOT_PASSWORD: ${WORKSPACE_DB_ROOT_PASSWORD:-workspace_root_only}
+    volumes:
+      - workspace_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  dev-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  dev-mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:8026:8025"
+    restart: unless-stopped
+
+  dev-backend:
+    image: jbam-workspace-backend:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    env_file: .env
+    environment:
+      APP_ENV: local
+      DB_HOST: dev-db
+      DB_PORT: 3306
+      DB_DATABASE: jbam_workspace
+      DB_USERNAME: jbam_workspace
+      DB_PASSWORD: ${WORKSPACE_DB_PASSWORD:-workspace_dev_only}
+      REDIS_HOST: dev-redis
+      CACHE_STORE: redis
+      CACHE_DRIVER: redis
+      QUEUE_CONNECTION: sync
+      BROADCAST_CONNECTION: log
+      SCOUT_DRIVER: "null"
+      FILESYSTEM_DISK: public
+      MAIL_MAILER: smtp
+      MAIL_HOST: dev-mailpit
+      MAIL_PORT: 1025
+      MAIL_ENCRYPTION: "null"
+      LOG_CHANNEL: stderr
+    volumes:
+      - workspace_storage:/var/www/html/storage
+    depends_on:
+      dev-db:
+        condition: service_healthy
+      dev-redis:
+        condition: service_started
+      dev-mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+  dev-api:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:${APP_PORT:-8082}:80"
+    volumes:
+      - ./docker/nginx/dev-api.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - dev-backend
+    networks:
+      default:
+        aliases: [api]
+    restart: unless-stopped
+
+  dev-web:
+    image: jbam-workspace-frontend:local
+    build:
+      context: ../BAM_frontend
+      dockerfile: Dockerfile
+      args:
+        NGINX_CONF: nginx.http.conf
+        VITE_API_URL: /api
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      - dev-api
+    restart: unless-stopped
+
+volumes:
+  workspace_mysql:
+  workspace_storage:

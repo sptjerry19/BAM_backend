@@ -28,10 +28,11 @@ Route::group([
     'middleware' => 'api',
 ], function () {
    // Public (no JWT) — browse courts & products
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
+    Route::post('/verify-reset-code', [AuthController::class, 'verifyResetCode'])->middleware('throttle:password-reset');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
 
     Route::group(['prefix' => 'products'], function () {
         Route::get('/', [ProductController::class, 'index']);
@@ -50,7 +51,7 @@ Route::group([
     });
 
     // Guest checkout allowed — member_id optional when logged in
-    Route::post('/orders', [OrderController::class, 'store']);
+    Route::post('/orders', [OrderController::class, 'store'])->middleware('throttle:10,1');
 
     Route::get('/rankings', [RankingController::class, 'index']);
     Route::get('/athletes/{athlete}', [RankingController::class, 'show']);

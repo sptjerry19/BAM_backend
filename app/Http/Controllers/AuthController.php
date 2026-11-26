@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\UpdateProfileRequest;
+use App\Http\Requests\Auth\VerifyResetCodeRequest;
 use App\Services\Auth\AuthService;
 use Illuminate\Http\JsonResponse;
 
@@ -65,13 +66,9 @@ class AuthController extends Controller
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $result = $this->auth->forgotPassword($request->validated()['email']);
+        $this->auth->forgotPassword($request->validated()['email']);
 
-        if (! $result) {
-            return $this->error(__('auth.email_not_found'), 404);
-        }
-
-        return $this->success($result, __('auth.forgot_success'));
+        return $this->success(null, 'Nếu email đã đăng ký, chúng tôi đã gửi mã đặt lại mật khẩu.');
     }
 
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
@@ -83,5 +80,16 @@ class AuthController extends Controller
         }
 
         return $this->success(null, __('auth.reset_success'));
+    }
+
+    public function verifyResetCode(VerifyResetCodeRequest $request): JsonResponse
+    {
+        $grant = $this->auth->verifyResetCode($request->validated());
+
+        if ($grant === null) {
+            return $this->error(__('auth.reset_invalid'), 422);
+        }
+
+        return $this->success(['reset_grant' => $grant], 'Mã xác nhận hợp lệ.');
     }
 }
