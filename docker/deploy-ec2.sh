@@ -63,8 +63,20 @@ set -a
 source .env
 set +a
 
-echo "==> Building & starting API stack..."
-docker compose --env-file .env up -d --build
+echo "==> Verify build, migrations, and tests in isolated Docker stack..."
+bash docker/verify-deploy.sh
+
+export COMPOSE_FILE=docker-compose.yml:docker-compose.social.yml
+export SKIP_ENTRYPOINT_MIGRATE=true
+export RUN_SCOUT_IMPORT=false
+echo "==> Build and inspect pending production migrations..."
+docker compose --env-file .env build backend
+docker compose --env-file .env run --rm --no-deps --entrypoint php backend artisan migrate --pretend --force --no-interaction
+
+echo "==> Start API and social services..."
+docker compose --env-file .env up -d --build --remove-orphans
+docker compose --env-file .env exec -T backend php artisan migrate --force --no-interaction
+docker compose --env-file .env exec -T backend php artisan migrate:status --no-ansi
 
 sleep 8
 docker compose ps

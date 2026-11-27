@@ -27,9 +27,9 @@ Route::get('/', function () {
 Route::group([
     'middleware' => 'api',
 ], function () {
-   // Public (no JWT) — browse courts & products
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
-    Route::post('/register', [AuthController::class, 'register']);
+    // Public (no JWT) — browse courts & products
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth-login');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth-register');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
     Route::post('/verify-reset-code', [AuthController::class, 'verifyResetCode'])->middleware('throttle:password-reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
@@ -50,29 +50,31 @@ Route::group([
         Route::get('/{court}', [CourtController::class, 'show']);
     });
 
-    // Guest checkout allowed — member_id optional when logged in
-    Route::post('/orders', [OrderController::class, 'store'])->middleware('throttle:10,1');
+    // Guest checkout allowed; the server derives member_id from JWT when present.
+    Route::post('/orders', [OrderController::class, 'store'])->middleware('throttle:checkout-order');
 
     Route::get('/rankings', [RankingController::class, 'index']);
     Route::get('/athletes/{athlete}', [RankingController::class, 'show']);
 
     Route::prefix('games/cr')->group(function () {
-        Route::post('/rooms', [CapitalRivalsRoomController::class, 'store']);
-        Route::post('/rooms/{code}/join', [CapitalRivalsRoomController::class, 'join']);
-        Route::post('/rooms/{code}/ready', [CapitalRivalsRoomController::class, 'ready']);
-        Route::post('/rooms/{code}/start', [CapitalRivalsRoomController::class, 'start']);
-        Route::post('/rooms/{code}/leave', [CapitalRivalsRoomController::class, 'leave']);
-        Route::post('/rooms/{code}/roll', [CapitalRivalsRoomController::class, 'roll']);
-        Route::post('/rooms/{code}/action', [CapitalRivalsRoomController::class, 'action']);
-        Route::post('/rooms/{code}/buy', [CapitalRivalsRoomController::class, 'buy']);
-        Route::post('/rooms/{code}/skip', [CapitalRivalsRoomController::class, 'skip']);
-        Route::post('/rooms/{code}/pay', [CapitalRivalsRoomController::class, 'pay']);
-        Route::post('/rooms/{code}/card', [CapitalRivalsRoomController::class, 'card']);
-        Route::post('/rooms/{code}/upgrade', [CapitalRivalsRoomController::class, 'upgrade']);
-        Route::post('/rooms/{code}/end-turn', [CapitalRivalsRoomController::class, 'endTurn']);
-        Route::post('/rooms/{code}/bankrupt', [CapitalRivalsRoomController::class, 'bankrupt']);
-        Route::post('/rooms/{code}/tick', [CapitalRivalsRoomController::class, 'tick']);
         Route::get('/rooms/{code}', [CapitalRivalsRoomController::class, 'snapshot']);
+        Route::middleware('throttle:game-action')->group(function () {
+            Route::post('/rooms', [CapitalRivalsRoomController::class, 'store'])->middleware('throttle:game-room');
+            Route::post('/rooms/{code}/join', [CapitalRivalsRoomController::class, 'join']);
+            Route::post('/rooms/{code}/ready', [CapitalRivalsRoomController::class, 'ready']);
+            Route::post('/rooms/{code}/start', [CapitalRivalsRoomController::class, 'start']);
+            Route::post('/rooms/{code}/leave', [CapitalRivalsRoomController::class, 'leave']);
+            Route::post('/rooms/{code}/roll', [CapitalRivalsRoomController::class, 'roll']);
+            Route::post('/rooms/{code}/action', [CapitalRivalsRoomController::class, 'action']);
+            Route::post('/rooms/{code}/buy', [CapitalRivalsRoomController::class, 'buy']);
+            Route::post('/rooms/{code}/skip', [CapitalRivalsRoomController::class, 'skip']);
+            Route::post('/rooms/{code}/pay', [CapitalRivalsRoomController::class, 'pay']);
+            Route::post('/rooms/{code}/card', [CapitalRivalsRoomController::class, 'card']);
+            Route::post('/rooms/{code}/upgrade', [CapitalRivalsRoomController::class, 'upgrade']);
+            Route::post('/rooms/{code}/end-turn', [CapitalRivalsRoomController::class, 'endTurn']);
+            Route::post('/rooms/{code}/bankrupt', [CapitalRivalsRoomController::class, 'bankrupt']);
+            Route::post('/rooms/{code}/tick', [CapitalRivalsRoomController::class, 'tick']);
+        });
     });
 
     // News
@@ -85,8 +87,8 @@ Route::group([
 
     // Authenticated member actions
     Route::group(['middleware' => 'auth:api'], function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::post('/refresh', [AuthController::class, 'refresh']);
+        Route::post('/logout', [AuthController::class, 'logout'])->middleware('throttle:auth-session');
+        Route::post('/refresh', [AuthController::class, 'refresh'])->middleware('throttle:auth-session');
         Route::get('/me', [AuthController::class, 'me']);
         Route::match(['put', 'post'], '/me', [AuthController::class, 'update']);
 
@@ -99,12 +101,12 @@ Route::group([
         Route::delete('/members/{member}/equipment/{product}', [MemberController::class, 'detachEquipment']);
         Route::delete('/custom-equipments/{id}', [MemberEquipmentController::class, 'destroy']);
 
-        Route::post('/bookings', [BookingController::class, 'store']);
+        Route::post('/bookings', [BookingController::class, 'store'])->middleware('throttle:checkout-booking');
 
         // Admin only — write / manage
         Route::middleware('admin')->group(function () {
             Route::get('/stats', [StatsController::class, 'index']);
-            Route::post('/uploads', [UploadController::class, 'store']);
+            Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:upload');
             Route::get('/members', [MemberController::class, 'index']);
             Route::patch('/members/{member}/status', [MemberController::class, 'updateStatus']);
             Route::delete('/members/{member}', [MemberController::class, 'destroy']);

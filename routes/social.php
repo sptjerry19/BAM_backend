@@ -31,7 +31,7 @@ Route::middleware(ThrottleRequests::class.':600,1')->group(function () {
     Route::middleware('auth:api')->group(function () {
         Route::patch('me/profile', [ProfileController::class, 'update']);
         Route::patch('me/privacy', [ProfileController::class, 'privacy']);
-        Route::post('social-media', [MediaController::class, 'store'])->middleware(ThrottleRequests::class.':20,1');
+        Route::post('social-media', [MediaController::class, 'store'])->middleware('throttle:social-upload');
         Route::post('social-media/{media}/retry', [MediaController::class, 'retry']);
         Route::delete('me/profile-image/{purpose}', [MediaController::class, 'remove']);
         Route::get('people', [RelationshipController::class, 'search']);

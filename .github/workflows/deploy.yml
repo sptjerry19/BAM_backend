@@ -10,7 +10,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    uses: ./.github/workflows/test.yml
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -25,6 +29,7 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/ubuntu/BAM_backend
+            export COMPOSE_FILE=docker-compose.yml:docker-compose.social.yml
 
             # Repo may have been cloned as root; Git 2.35+ blocks that for ubuntu.
             git config --global --add safe.directory /home/ubuntu/BAM_backend
@@ -63,9 +68,13 @@ jobs:
             echo "==> Free disk before build"
             docker image prune -f
 
-            echo "==> Build & restart stack"
+            echo "==> Build backend and check pending migrations before restart"
             export RUN_SCOUT_IMPORT=false
             export SKIP_ENTRYPOINT_MIGRATE=true
+            docker compose --env-file .env build backend
+            docker compose --env-file .env run --rm --no-deps --entrypoint php backend artisan migrate --pretend --force --no-interaction
+
+            echo "==> Restart stack"
             docker compose --env-file .env up -d --build --remove-orphans
 
             echo "==> Wait for php-fpm"
@@ -92,6 +101,10 @@ jobs:
               free -h
               exit 1
             fi
+
+            echo "==> Apply and verify migrations"
+            docker compose --env-file .env exec -T backend php artisan migrate --force --no-interaction
+            docker compose --env-file .env exec -T backend php artisan migrate:status --no-ansi
 
             echo "==> Prune dangling images"
             docker image prune -f

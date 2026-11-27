@@ -68,6 +68,20 @@ class ProfileSocialTest extends TestCase
         $this->getJson('/api/profiles/'.$this->a->id.'/posts')->assertOk()->assertJsonCount(0, 'data.data');
     }
 
+    public function test_only_me_post_is_hidden_from_public_feed_and_direct_link(): void
+    {
+        $private = $this->asUser($this->a)->postJson('/api/posts', ['body' => 'Private note', 'audience' => 'only_me'])
+            ->assertOk()->json('data.id');
+        $public = $this->postJson('/api/posts', ['body' => 'Public note', 'audience' => 'public'])
+            ->assertOk()->json('data.id');
+
+        $this->asUser($this->b)->getJson('/api/posts/'.$private)->assertNotFound();
+        $this->getJson('/api/posts/'.$public)->assertOk();
+        $posts = $this->getJson('/api/profiles/'.$this->a->id.'/posts')->assertOk()->json('data.data');
+        $this->assertSame([$public], array_column($posts, 'id'));
+        $this->asUser($this->a)->getJson('/api/posts/'.$private)->assertOk();
+    }
+
     public function test_media_signature_does_not_bypass_changed_audience(): void
     {
         $media = $this->asUser($this->a)->post('/api/social-media', ['purpose' => 'post', 'file' => UploadedFile::fake()->image('test.jpg')], ['Accept' => 'application/json'])->assertCreated()->json('data.id');

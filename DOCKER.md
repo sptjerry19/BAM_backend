@@ -39,6 +39,8 @@ docker compose -p jbam_workspace -f docker-compose.workspace.yml up -d --build
 
 Frontend: <http://127.0.0.1:5173> · API: <http://127.0.0.1:8082/api> · Mailpit: <http://127.0.0.1:8026>.
 
+PHP local của workspace chạy trong image `php:8.4-fpm-bookworm`; dùng `docker compose -p jbam_workspace -f docker-compose.workspace.yml exec dev-backend php -v` để kiểm tra phiên bản. Không cần PHP trên host. Sau khi thay source, chạy lại lệnh build ở trên để cập nhật container. Frontend cài dependency sạch bằng `cd ../BAM_frontend && npm ci`, sau đó `npm run build`.
+
 - Host **80/443** → để cho **frontend** (SSL: https://jbam.id.vn)
 - Backend API local publish **8082** (`APP_PORT` trong `.env`); cổng 8080 đang dành cho `landing`
 - Production `.env`: `APP_URL=https://jbam.id.vn`
@@ -75,6 +77,8 @@ EC2/production: **không** dùng override — deploy vẫn `up -d --build` như 
 Rồi chạy FE (repo riêng) trên port 80 — xem `frontend/DOCKER.md`.
 
 ## Deploy EC2
+
+Trước mọi deploy chạy `bash docker/verify-deploy.sh`: script build image production, kiểm tra migration trên MySQL tạm, rồi chạy toàn bộ test trong Docker với Mailpit. Workflow deploy trên GitHub bắt buộc job này thành công; deploy thủ công bên dưới cũng gọi cùng script. Trên server, workflow kiểm tra migration chờ bằng `migrate --pretend` trước khi restart và chạy `migrate --force` sau khi backend sẵn sàng. Xem [README.md](README.md) để biết thứ tự vận hành và các service social.
 
 ```bash
 bash docker/deploy-ec2.sh

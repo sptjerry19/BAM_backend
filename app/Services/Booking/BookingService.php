@@ -4,7 +4,6 @@ namespace App\Services\Booking;
 
 use App\Models\Booking;
 use App\Models\Court;
-use App\Models\Member;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +53,6 @@ class BookingService
      */
     public function create(array $data): array
     {
-        $court = Court::findOrFail($data['court_id']);
         $slots = array_values($data['slots'] ?? []);
 
         if ($slots === []) {
@@ -64,22 +62,19 @@ class BookingService
         }
 
         $status = ($data['payment_method'] ?? '') === 'venue' ? 'confirmed' : 'pending';
-        $memberId = $data['member_id'] ?? auth()->user()?->member_id;
-        if ($memberId && ! Member::query()->whereKey($memberId)->exists()) {
-            $memberId = null;
-        }
+        $memberId = auth('api')->user()?->member_id;
 
-        $created = DB::transaction(function () use ($court, $data, $slots, $status, $memberId) {
+        [$court, $created] = DB::transaction(function () use ($data, $slots, $status, $memberId) {
+            // Lock the court even when no bookings exist yet. Concurrent requests for
+            // the same court then check availability one after another.
+            $court = Court::query()->whereKey($data['court_id'])->lockForUpdate()->firstOrFail();
+            $rows = [];
             foreach ($slots as $index => $slot) {
                 $this->assertBookable($court, array_merge($data, [
                     'court_number' => $slot['court_number'],
                     'start_time' => $slot['start_time'],
                     'hours' => $slot['hours'],
                 ]), 'slots.'.$index);
-            }
-
-            $rows = [];
-            foreach ($slots as $slot) {
                 $hours = (float) $slot['hours'];
                 $rows[] = Booking::create([
                     'court_id' => $court->id,
@@ -98,7 +93,7 @@ class BookingService
                 ])->load(['court', 'member']);
             }
 
-            return $rows;
+            return [$court, $rows];
         });
 
         $numbers = array_map(fn (Booking $b) => (int) $b->court_number, $created);

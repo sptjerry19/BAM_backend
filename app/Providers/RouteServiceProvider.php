@@ -32,6 +32,19 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->path().':'.$request->ip());
         });
 
+        RateLimiter::for('auth-login', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        RateLimiter::for('auth-register', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
+        RateLimiter::for('auth-session', fn (Request $request) => Limit::perMinute(30)->by($request->user('api')?->id ?: $request->ip()));
+        RateLimiter::for('checkout-order', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+        RateLimiter::for('checkout-booking', fn (Request $request) => Limit::perMinute(8)->by($request->user('api')?->id ?: $request->ip()));
+        RateLimiter::for('upload', fn (Request $request) => Limit::perMinute(12)->by($request->user('api')?->id ?: $request->ip()));
+        RateLimiter::for('social-upload', fn (Request $request) => Limit::perMinute(20)->by($request->user('api')?->id ?: $request->ip()));
+        RateLimiter::for('game-action', fn (Request $request) => [
+            Limit::perMinute(120)->by('ip:'.$request->ip()),
+            Limit::perMinute(60)->by('player:'.hash('sha256', (string) ($request->header('X-Player-Token') ?: $request->input('player_token') ?: $request->ip()))),
+        ]);
+        RateLimiter::for('game-room', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

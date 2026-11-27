@@ -17,8 +17,8 @@ class StoreBookingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'member_id' => 'prohibited',
             'court_id' => 'required|exists:courts,id',
-            'member_id' => 'nullable|exists:members,id',
             'booking_date' => 'required|date',
             'slots' => 'required|array|min:1|max:40',
             'slots.*.court_number' => 'required|integer|min:1',

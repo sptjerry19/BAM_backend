@@ -67,7 +67,8 @@ class PasswordResetSecurityTest extends TestCase
         }
 
         $this->assertSame('smtp', config('mail.default'));
-        $this->assertSame('mailpit', config('mail.mailers.smtp.host'));
+        $mailpitHost = getenv('MAILPIT_HOST') ?: 'mailpit';
+        $this->assertSame($mailpitHost, config('mail.mailers.smtp.host'));
         $this->assertSame(1025, (int) config('mail.mailers.smtp.port'));
         $email = 'reset-'.uniqid().'@example.test';
         User::create(['name' => 'Owner', 'email' => $email, 'password' => 'old-password', 'role' => 'user']);
@@ -75,7 +76,7 @@ class PasswordResetSecurityTest extends TestCase
         $this->postJson('/api/forgot-password', ['email' => $email])
             ->assertOk()->assertJsonPath('data', null);
 
-        $messages = Http::get('http://mailpit:8025/api/v1/messages')->throw()->json('messages');
+        $messages = Http::get('http://'.$mailpitHost.':8025/api/v1/messages')->throw()->json('messages');
         $this->assertTrue(collect($messages)->contains(fn ($message) => collect($message['To'] ?? [])
             ->contains(fn ($recipient) => ($recipient['Address'] ?? null) === $email)));
     }

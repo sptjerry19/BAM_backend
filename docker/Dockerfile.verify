@@ -1,0 +1,6 @@
+ARG BASE_IMAGE=jbam-backend:verify
+FROM ${BASE_IMAGE}
+
+WORKDIR /var/www/html
+RUN cp .env.example .env \
+    && composer install --no-interaction --prefer-dist --no-progress
